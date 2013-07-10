@@ -4,6 +4,7 @@ THIS=$( cd "$( dirname "$0" )" && pwd )
 
 usage()
 {
+        echo "emma-node install"
 	echo "install.sh DESTINATION"
 	echo "		DESTINATION: The location of a Contiki directory (David Kopf branch)"
 }
@@ -16,6 +17,7 @@ else
 fi
 
 echo "Installing 'emma-node' ..."
+cp -R $THIS/dep/contiki/* $DEST/
 
 # Patch Contiki OS
 patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-raven.diff
