@@ -1,0 +1,88 @@
+diff -crB ./cooja-avrora-patch-wip-davidkopf/platform/avr-raven/slip_uart0.c ./for-clean-diff/platform/avr-raven/slip_uart0.c
+*** ./cooja-avrora-patch-wip-davidkopf/platform/avr-raven/slip_uart0.c	2012-06-20 08:11:38.000000000 +0200
+--- ./for-clean-diff/platform/avr-raven/slip_uart0.c	2013-03-18 16:06:52.320891029 +0100
+***************
+*** 33,41 ****
+  
+  /**
+   * \file
+!  *         Machine dependent AVR SLIP routines for UART0.
+   * \author
+!  *         Kasun Hewage <kasun.ch@gmail.com>
+   */
+  
+  #include <stdio.h>
+--- 33,41 ----
+  
+  /**
+   * \file
+!  *         SLIP routine for AVR platforms
+   * \author
+!  *         Nicolas Mardegan <mardegan@ece.fr>
+   */
+  
+  #include <stdio.h>
+***************
+*** 44,93 ****
+  #include "slip.h"
+  
+  /*---------------------------------------------------------------------------*/
+- static int
+- slip_putchar(char c, FILE *stream)
+- {
+- #define SLIP_END 0300
+-   static char debug_frame = 0;
+- 
+-   if (!debug_frame) {        /* Start of debug output */
+-     slip_arch_writeb(SLIP_END);
+-     slip_arch_writeb('\r'); /* Type debug line == '\r' */
+-     debug_frame = 1;
+-   }
+- 
+-   slip_arch_writeb((unsigned char)c);
+-           
+-   /*
+-    * Line buffered output, a newline marks the end of debug output and
+-    * implicitly flushes debug output.         
+-    */
+-   if (c == '\n') {
+-     slip_arch_writeb(SLIP_END);
+-     debug_frame = 0;
+-   }
+- 
+-   return c;
+- }
+- /*---------------------------------------------------------------------------*/
+- static FILE slip_stdout = FDEV_SETUP_STREAM(slip_putchar, NULL,
+-                                             _FDEV_SETUP_WRITE);
+- /*---------------------------------------------------------------------------*/
+  void
+  slip_arch_init(unsigned long ubr)
+  {
+!   rs232_set_input(RS232_PORT_0, slip_input_byte);
+!   stdout = &slip_stdout;
+  }
+  /*---------------------------------------------------------------------------*/
+- /*
+-  XXX:
+-       Currently, the following function is in cpu/avr/dev/rs232.c file. this
+-       should be moved to here from there hence this is a platform specific slip 
+-       related function. 
+- void
+- slip_arch_writeb(unsigned char c)
+- {
+-   rs232_send(RS232_PORT_0, c);
+- }
+- */
+--- 44,53 ----
+  #include "slip.h"
+  
+  /*---------------------------------------------------------------------------*/
+  void
+  slip_arch_init(unsigned long ubr)
+  {
+!   rs232_init(SLIP_PORT, BAUD_RATE(ubr), USART_PARITY_NONE|USART_STOP_BITS_1|USART_DATA_BITS_8);
+!   rs232_set_input(SLIP_PORT, slip_input_byte);
+  }
+  /*---------------------------------------------------------------------------*/
+Seulement dans ./for-clean-diff/platform/avr-raven: slip_uart0.c~

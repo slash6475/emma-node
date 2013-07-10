@@ -1,0 +1,12 @@
+*** ./cooja-avrora-patch-wip-davidkopf_ori/examples/ipv6/rpl-border-router/project-conf.h	2012-06-20 07:11:38.000000000 +0200
+--- ./cooja-avrora-patch-wip-davidkopf/examples/ipv6/rpl-border-router/project-conf.h	2013-04-04 11:04:13.190717764 +0200
+***************
+*** 52,55 ****
+--- 52,58 ----
+  #define WEBSERVER_CONF_CFS_CONNS 2
+  #endif
+  
++ #undef NETSTACK_CONF_RDC
++ #define NETSTACK_CONF_RDC     nullrdc_driver
++ 
+  #endif /* __PROJECT_ROUTER_CONF_H__ */

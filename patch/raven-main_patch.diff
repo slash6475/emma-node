@@ -1,0 +1,175 @@
+*** ./cooja-avrora-patch-wip-davidkopf_ori/platform/avr-raven/contiki-raven-main.c	2012-06-20 07:11:38.000000000 +0200
+--- ./cooja-avrora-patch-wip-davidkopf/platform/avr-raven/contiki-raven-main.c	2013-04-10 15:00:05.116714420 +0200
+***************
+*** 39,45 ****
+  #define PRINTA(...)
+  #endif
+  
+! #define DEBUG 1
+  #if DEBUG
+  #define PRINTD(FORMAT,args...) printf_P(PSTR(FORMAT),##args)
+  #else
+--- 39,45 ----
+  #define PRINTA(...)
+  #endif
+  
+! #define DEBUG 1
+  #if DEBUG
+  #define PRINTD(FORMAT,args...) printf_P(PSTR(FORMAT),##args)
+  #else
+***************
+*** 47,53 ****
+  #endif
+  
+  /* Track interrupt flow through mac, rdc and radio driver */
+! #define DEBUGFLOWSIZE 32
+  #if DEBUGFLOWSIZE
+  unsigned char debugflowsize,debugflow[DEBUGFLOWSIZE];
+  #define DEBUGFLOW(c) if (debugflowsize<(DEBUGFLOWSIZE-1)) debugflow[debugflowsize++]=c
+--- 47,53 ----
+  #endif
+  
+  /* Track interrupt flow through mac, rdc and radio driver */
+! #define DEBUGFLOWSIZE 32
+  #if DEBUGFLOWSIZE
+  unsigned char debugflowsize,debugflow[DEBUGFLOWSIZE];
+  #define DEBUGFLOW(c) if (debugflowsize<(DEBUGFLOWSIZE-1)) debugflow[debugflowsize++]=c
+***************
+*** 127,133 ****
+  void rtimercycle(void) {rtimerflag=1;}
+  #endif
+  #endif
+! uint16_t node_id = 0;
+  
+  /*-------------------------------------------------------------------------*/
+  /*----------------------Configuration of the .elf file---------------------*/
+--- 127,133 ----
+  void rtimercycle(void) {rtimerflag=1;}
+  #endif
+  #endif
+! uint16_t node_id = 0;
+  
+  /*-------------------------------------------------------------------------*/
+  /*----------------------Configuration of the .elf file---------------------*/
+***************
+*** 266,282 ****
+        PRINTA("Random EUI64 address generated\n");
+    }
+   
+! #if UIP_CONF_IPV6
+!   PRINTD("Initial node_id %u\n",node_id);
+!   if (node_id) {
+!     addr.u8[3]=node_id&0xff;
+!     addr.u8[4]=(node_id&0xff)>>8;  
+!     addr.u8[5]=node_id;
+!     addr.u8[6]=node_id;
+!     addr.u8[7]=node_id;
+!   } else {
+!     node_id=addr.u8[7]+(addr.u8[6]<<8);
+!   }
+    memcpy(&uip_lladdr.addr, &addr.u8, sizeof(rimeaddr_t));
+    rimeaddr_set_node_addr(&addr);  
+    rf230_set_pan_addr(params_get_panid(),params_get_panaddr(),(uint8_t *)&addr.u8);
+--- 266,282 ----
+        PRINTA("Random EUI64 address generated\n");
+    }
+   
+! #if UIP_CONF_IPV6
+!   PRINTD("Initial node_id %u\n",node_id);
+!   if (node_id) {
+!     addr.u8[3]=node_id&0xff;
+!     addr.u8[4]=(node_id&0xff)>>8;  
+!     addr.u8[5]=node_id;
+!     addr.u8[6]=node_id;
+!     addr.u8[7]=node_id;
+!   } else {
+!     node_id=addr.u8[7]+(addr.u8[6]<<8);
+!   }
+    memcpy(&uip_lladdr.addr, &addr.u8, sizeof(rimeaddr_t));
+    rimeaddr_set_node_addr(&addr);  
+    rf230_set_pan_addr(params_get_panid(),params_get_panaddr(),(uint8_t *)&addr.u8);
+***************
+*** 350,356 ****
+  
+    /*---If using coffee file system create initial web content if necessary---*/
+  #if COFFEE_FILES
+!   int fa = cfs_open( "/index.html", CFS_READ);
+    if (fa<0) {     //Make some default web content
+      PRINTA("No index.html file found, creating upload.html!\n");
+      PRINTA("Formatting FLASH file system for coffee...");
+--- 350,357 ----
+  
+    /*---If using coffee file system create initial web content if necessary---*/
+  #if COFFEE_FILES
+! // NM commented
+! /*  int fa = cfs_open( "/index.html", CFS_READ);
+    if (fa<0) {     //Make some default web content
+      PRINTA("No index.html file found, creating upload.html!\n");
+      PRINTA("Formatting FLASH file system for coffee...");
+***************
+*** 360,368 ****
+      int r = cfs_write(fa, &"It works!", 9);
+      if (r<0) PRINTA("Can''t create /index.html!\n");
+      cfs_close(fa);
+  //  fa = cfs_open("upload.html"), CFW_WRITE);
+  // <html><body><form action="upload.html" enctype="multipart/form-data" method="post"><input name="userfile" type="file" size="50" /><input value="Upload" type="submit" /></form></body></html>
+!   }
+  #endif /* COFFEE_FILES */
+  
+  /* Add addresses for testing */
+--- 361,371 ----
+      int r = cfs_write(fa, &"It works!", 9);
+      if (r<0) PRINTA("Can''t create /index.html!\n");
+      cfs_close(fa);
++     
++     
+  //  fa = cfs_open("upload.html"), CFW_WRITE);
+  // <html><body><form action="upload.html" enctype="multipart/form-data" method="post"><input name="userfile" type="file" size="50" /><input value="Upload" type="submit" /></form></body></html>
+!   }//*/
+  #endif /* COFFEE_FILES */
+  
+  /* Add addresses for testing */
+***************
+*** 478,484 ****
+  #if DEBUGFLOWSIZE
+    if (debugflowsize) {
+      debugflow[debugflowsize]=0;
+!     PRINTF("%s\n",debugflow);
+      debugflowsize=0;
+     }
+  #endif
+--- 481,487 ----
+  #if DEBUGFLOWSIZE
+    if (debugflowsize) {
+      debugflow[debugflowsize]=0;
+!     PRINTF("%s\n",debugflow);
+      debugflowsize=0;
+     }
+  #endif
+***************
+*** 592,603 ****
+  #endif
+  
+  #if RF230BB&&0
+! extern uint8_t rf230interruptflag;
+!     if (rf230interruptflag) {
+!  //   if (rf230interruptflag!=11) {
+!         PRINTF("**RI%u\n",rf230interruptflag);
+   //   }
+!       rf230interruptflag=0;
+      }
+  #endif
+    }
+--- 595,606 ----
+  #endif
+  
+  #if RF230BB&&0
+! extern uint8_t rf230interruptflag;
+!     if (rf230interruptflag) {
+!  //   if (rf230interruptflag!=11) {
+!         PRINTF("**RI%u\n",rf230interruptflag);
+   //   }
+!       rf230interruptflag=0;
+      }
+  #endif
+    }

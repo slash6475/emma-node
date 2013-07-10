@@ -1,0 +1,167 @@
+diff -crB ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.c ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.c
+*** ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.c	2012-06-20 07:11:38.000000000 +0200
+--- ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.c	2013-07-01 08:53:10.913161484 +0200
+***************
+*** 76,82 ****
+  void
+  rest_activate_resource(resource_t* resource)
+  {
+!   PRINTF("Activating: %s", resource->url);
+  
+    if (!resource->pre_handler)
+    {
+--- 76,82 ----
+  void
+  rest_activate_resource(resource_t* resource)
+  {
+!   PRINTF("Activating: %s\n", resource->url);
+  
+    if (!resource->pre_handler)
+    {
+***************
+*** 90,95 ****
+--- 90,102 ----
+    list_add(restful_services, resource);
+  }
+  
++ void rest_disable_resource(resource_t* resource)
++ {
++ 	PRINTF("Disabling: %s\n", resource->url);
++ 	
++ 	list_remove(restful_services, resource);
++ }
++ 
+  void
+  rest_activate_periodic_resource(periodic_resource_t* periodic_resource)
+  {
+***************
+*** 148,169 ****
+  {
+    uint8_t found = 0;
+    uint8_t allowed = 0;
+  
+!   PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
+  
+    resource_t* resource = NULL;
+    const char *url = NULL;
+  
+    for (resource = (resource_t*)list_head(restful_services); resource; resource = resource->next)
+    {
+      /*if the web service handles that kind of requests and urls matches*/
+!     if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES)))
+!         && strncmp(resource->url, url, strlen(resource->url)) == 0)
+      {
+        found = 1;
+-       rest_resource_flags_t method = REST.get_method_type(request);
+  
+!       PRINTF("method %u, resource->flags %u\n", (uint16_t)method, resource->flags);
+  
+        if (resource->flags & method)
+        {
+--- 155,198 ----
+  {
+    uint8_t found = 0;
+    uint8_t allowed = 0;
++   
++   int resourceUrlLen = 0;
++   int requestUrlLen = 0;
+  
+!   //PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
+  
+    resource_t* resource = NULL;
++   resource_t* defaultResource = NULL;
+    const char *url = NULL;
+  
++ 	requestUrlLen = REST.get_url(request, &url);
++ 	PRINTF("[ERBIUM] Handling request on resource: '");
++ 	for(resourceUrlLen=0 ; resourceUrlLen<requestUrlLen ; resourceUrlLen++) PRINTF("%c-", url[resourceUrlLen]);
++ 	PRINTF("'.\n");
++ 	//PRINTF("[ERBIUM] toto.\n");
++ 	// Looking for resource associated with the exact request URL
++ 	
++ 	rest_resource_flags_t method = REST.get_method_type(request);
++ 	
+    for (resource = (resource_t*)list_head(restful_services); resource; resource = resource->next)
+    {
++     resourceUrlLen = strlen(resource->url);
++     if (resourceUrlLen == 0) defaultResource = resource;
++     
++     
+      /*if the web service handles that kind of requests and urls matches*/
+!     //if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES))) && strncmp(resource->url, url, strlen(resource->url)) == 0)
+!     //if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If resource exists
+!     
+!     if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, requestUrlLen) == 0)) // swap in strcmp
+!     
+!     //if ((requestUrlLen == resourceUrlLen) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If exact resource exists
+      {
+        found = 1;
+  
+!       PRINTF("method %u, resource->flags %02X\n", (uint16_t)method, resource->flags);
+!       //if (resource->flags & HAS_SUB_RESOURCES) PRINTF("[ERBIUM] HAS SUB-RESOURCES\n");
+! 			//else PRINTF("[ERBIUM] FLAGS: %02X\n", resource->flags);
+  
+        if (resource->flags & method)
+        {
+***************
+*** 186,196 ****
+        }
+        break;
+      }
+!   }
+  
+!   if (!found) {
+!     REST.set_response_status(response, REST.status.NOT_FOUND);
+!   }
+  
+    return found & allowed;
+  }
+--- 215,249 ----
+        }
+        break;
+      }
+!   }  
+! 	
+! 	if (!found && defaultResource)
+! 	{
+! 		if (defaultResource->flags & method)
+!     {
+!       found = 1;
+!       allowed = 1;
+  
+!       /*call pre handler if it exists*/
+!       if (!defaultResource->pre_handler || defaultResource->pre_handler(defaultResource, request, response))
+!       {
+!         /* call handler function*/
+!         defaultResource->handler(request, response, buffer, buffer_size, offset);
+! 
+!         /*call post handler if it exists*/
+!         if (defaultResource->post_handler)
+!         {
+!           defaultResource->post_handler(defaultResource, request, response);
+!         }
+!       }
+!     } else {
+!       REST.set_response_status(response, REST.status.METHOD_NOT_ALLOWED);
+!     }
+! 	}
+! 	else if (!found)
+! 	{
+! 		REST.set_response_status(response, REST.status.NOT_FOUND);
+! 	}
+  
+    return found & allowed;
+  }
+diff -crB ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.h ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.h
+*** ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.h	2012-06-20 07:11:38.000000000 +0200
+--- ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.h	2013-03-19 11:28:19.264095980 +0100
+***************
+*** 294,299 ****
+--- 294,300 ----
+   * Resources wanted to be accessible should be activated with the following code.
+   */
+  void rest_activate_resource(resource_t* resource);
++ void rest_disable_resource(resource_t* resource);
+  void rest_activate_periodic_resource(periodic_resource_t* periodic_resource);
+  void rest_activate_event_resource(resource_t* resource);
+  

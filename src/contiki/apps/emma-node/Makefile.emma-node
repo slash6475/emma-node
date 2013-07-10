@@ -1,0 +1,1 @@
+emma-node_src = emma-init.c emma-resource.c emma-server.c emma-client.c root-agent.c root-resource.c root-local.c emma-JSONnParse.c emma-eval.c
