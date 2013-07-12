@@ -25,6 +25,9 @@ patch -p2 --directory=$DEST --input=$THIS/patch/patch_erbium.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/raven-main_patch.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/border-router_patch.diff
 
+# Temporary CFS patch
+patch -p2 --directory=$DEST --input=$THIS/patch/cfs_patch.diff
+
 # Copy EMMA application and example
 cp -r $THIS/src/contiki/apps/emma-node $DEST/apps/
 cp -r $THIS/src/contiki/examples/emma-node-example $DEST/examples/
