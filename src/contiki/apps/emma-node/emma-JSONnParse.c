@@ -62,7 +62,8 @@ json_state_t JSONnParse(json_parser_t* parser, char c, depth_t depth)
 		else if (c == '{')
 		{
 			parser->objDepth++;
-			return JSON_OBJ_START;
+			ret = JSON_OBJ_START;
+			//return JSON_OBJ_START;
 		}
 		else if (c == '}')
 		{
@@ -83,6 +84,7 @@ json_state_t JSONnParse(json_parser_t* parser, char c, depth_t depth)
 		}
 		
 		if ((parser->objDepth + parser->arrDepth) > depth){ret = JSON_CONTENT;}
+		if (((parser->objDepth + parser->arrDepth) == depth+1) && (c == '{')){ret = JSON_OBJ_START;}
 		if (((parser->objDepth + parser->arrDepth) == depth+1) && (c == '[')){ret = JSON_ARR_START;}
 		
 		/*if (parser->objDepth > 0)

@@ -35,10 +35,10 @@
 //#define PROCESS_DEBUG TRUE
 
 /* Client debug level */
-#define CLIENT_DEBUG FALSE
+#define CLIENT_DEBUG TRUE
 
 /* Client server level */
-#define SERVER_DEBUG FALSE
+#define SERVER_DEBUG TRUE
 
 /* Resource debug level */
 #define RESOURCE_DEBUG FALSE

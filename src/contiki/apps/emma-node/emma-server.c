@@ -168,8 +168,8 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 				if (block_num == 0)
 				{
 					emma_resource_add(emma_get_resource_root(uri), emma_get_resource_name(uri));
-					locked = emma_resource_lock(uri);
-					opened = emma_resource_open(uri);
+					if (!locked) locked = emma_resource_lock(uri);
+					if(!opened) opened = emma_resource_open(uri);
 				}
 				if (locked)
 				{
