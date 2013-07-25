@@ -26,6 +26,7 @@ WITH_EMMA_SHELL=0
 
 # linker optimizations
 SMALL=1
+CFLAGS += -DRS232_PORT=1
 
 # EMMA shell, requires EMMA_SHELL
 ifeq ($(WITH_EMMA_SHELL), 1)
