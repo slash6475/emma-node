@@ -90,7 +90,13 @@ static char* getFileName(uint8_t memoryIndex)
 	}
 }
 
-void root_agent_init() {ROOT_MEM_INIT(); memset(memory, 0, ROOT_AGENT_MAX_ALLOC);}
+void root_agent_init()
+{
+	ROOT_MEM_INIT();
+	memset(memory, 0, ROOT_AGENT_MAX_ALLOC);
+	cfs_coffee_format();
+}
+
 static void* root_agent_alloc()
 {
 	root_agent_t* agent = ROOT_ALLOC(0);
@@ -178,6 +184,8 @@ int root_agent_write(void* user_data, uint8_t* data_block, emma_size_t block_siz
 	int nbBytesWritten = 0;
 	cfs_offset_t offset = 0;
 	
+	if (block_index < agent->size) return 0; // Do not write multiple times the same block !!
+	
 	// Verify block
 	if (root_agent_analyze_block(agent, data_block, block_size, block_index) != 0)
 	{
@@ -197,7 +205,14 @@ int root_agent_write(void* user_data, uint8_t* data_block, emma_size_t block_siz
 			offset = cfs_seek(fd, block_index, CFS_SEEK_SET);
 			
 			// Write data
-			if (offset >= 0) nbBytesWritten = cfs_write(fd, data_block, block_size);
+			if (offset >= 0)
+			{
+				nbBytesWritten = cfs_write(fd, data_block, block_size);
+			}
+			else
+			{
+				PRINT("[WRITE] Unable to seek file\n");
+			}
 			PRINT("[WRITE] Writing '%s' at %d.\n", getFileName(agent->memoryIndex), offset);
 			
 			// Close file
@@ -228,23 +243,38 @@ int root_agent_read(void* user_data, uint8_t* data_block, emma_size_t block_size
 	{
 		// Agent is active, try to get data block
 		int fd = cfs_open(getFileName(agent->memoryIndex), CFS_READ);
+		//PRINT("[READ] Opening file '%s'\n", getFileName(agent->memoryIndex));
 		if (fd >= 0)
 		{
-			//PRINTF("[AGENT SET DATA] Opening file '%s'\n", agent->name);
 			// Seek to the right amount of blocks
 			offset = cfs_seek(fd, block_index, CFS_SEEK_SET);
 			
 			// Read data
-			if (offset >= 0) nbBytesRead = cfs_read(fd, data_block, block_size);
-			//PRINT("[READ] Reading '%s' at %d.\n", getFileName(agent->memoryIndex), offset);
+			if (offset >= 0)
+			{
+				nbBytesRead = cfs_read(fd, data_block, block_size);
+			}
+			else
+			{
+				PRINT("[READ] Unable to seek file\n");
+			}
+			PRINT("[READ] Reading '%s' at %d.\n", getFileName(agent->memoryIndex), offset);
 			
 			// Close file
 			cfs_close(fd);
-			//PRINTF("[AGENT SET DATA] '%s'closed\n", agent->name);
+			//PRINT("[READ] '%s'closed\n", getFileName(agent->memoryIndex));
 		}
-		else nbBytesRead = 0;
+		else
+		{
+			PRINT("[READ] Unable to open file '%s'.\n", getFileName(agent->memoryIndex));
+			nbBytesRead = 0;
+		}
 	}
-	else nbBytesRead = 0;
+	else
+	{
+		PRINT("[READ] Empty agent\n");
+		nbBytesRead = 0;
+	}
 	return nbBytesRead;
 }
 

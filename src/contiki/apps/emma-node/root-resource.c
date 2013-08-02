@@ -58,8 +58,14 @@ eval_status_t root_resource_solver (uint8_t* reference, uint8_t referenceSize, o
 	if (((reference != NULL) && (referenceSize != 0)) && (value != NULL))
 	{
 		snprintf(buffer, MIN(referenceSize + 1, EMMA_MAX_URI_SIZE), "%s", (char*)reference);
+		if (referenceSize >= 2)
+		{
+			// Switch R (remote) with L (local) upon packet reception
+			if (buffer[0] == 'R' && buffer[1]=='#') buffer[0]='L';
+			//else PRINT("[REFERENCE SOLVER] No translation R -> L\n");
+		}
 		while(cnt < MIN(referenceSize + 1, EMMA_MAX_URI_SIZE)) {if(buffer[cnt]=='#')buffer[cnt]='/';cnt++;}
-		PRINTS("[REFERENCE SOLVER] Solving reference of '%s'\n", buffer);
+		PRINT("[REFERENCE SOLVER] Solving reference of '%s'\n", buffer);
 		/*nbBytesRead = rest_get_data_block(buffer, (uint8_t*)value, sizeof(operand_t), 0, NULL);
 		if (nbBytesRead == 4)
 		{
@@ -185,7 +191,7 @@ int root_resource_close(void* data)
 
 emma_resource_root_t root_resource = {
 	0,
-	"R",
+	"L",
 	"ct=\"text/raw\";rt=\"Resource\"",
 	//"",
 	

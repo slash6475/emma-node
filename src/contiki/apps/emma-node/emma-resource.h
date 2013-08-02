@@ -223,6 +223,15 @@ emma_resource_access_t get_resources_access(emma_resource_root_id_t root);
 char* get_resources_root_description(emma_resource_root_id_t root);
 
 /**
+	* Check if resource exists
+	*
+	* \param uri A NULL-terminated string that represents the URI of the resource
+	*
+	* \return 1 if resource exists, 0 otherwise.
+	*/
+uint8_t emma_resource_exists(char* uri);
+
+/**
 	* Add an EMMA resource.
 	*
 	* \param root The ROOT-resource identifier.

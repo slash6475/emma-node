@@ -22,12 +22,12 @@
 // Include all roots files here
 #include "root-agent.h"
 #include "root-resource.h"
-#include "root-local.h"
+//#include "root-local.h"
 
 static emma_resource_root_t* resources_roots[] = {
 	EMMA_RESOURCE_ROOT(root_agent),
 	EMMA_RESOURCE_ROOT(root_resource),
-	EMMA_RESOURCE_ROOT(root_local),
+	//EMMA_RESOURCE_ROOT(root_local),
 };
 
 
@@ -108,6 +108,7 @@ static char* emma_get_resource_basename(char* uri)
 static char* emma_get_name(char* uri)
 {
 	int cnt=0;
+	if (!uri) return NULL;
 	while(uri[cnt]!='\0' && uri[cnt]!='/') cnt++;
 	if (uri[cnt]=='\0') return (uri + cnt);
 	else return (uri + cnt + 1);
@@ -117,6 +118,7 @@ static emma_resource_root_id_t emma_get_root(char* uri)
 {
 	int cnt = 0;
 	int rootLength = 0;
+	if (!uri) return 0;
 	while (uri[cnt] != '\0' && uri[cnt] != '/') cnt++;
 	rootLength = cnt;
 	//PRINT("[GET ROOT] Watching '%s' ; rootLength=%d\n", uri, rootLength);
@@ -444,6 +446,21 @@ char* get_resources_root_description(emma_resource_root_id_t root)
 	if (root <= 0 || root > EMMA_NB_ROOTS) return NULL;
 	else root--;
 	return (resources_roots[root])->description;
+}
+
+uint8_t emma_resource_exists(char* uri)
+{
+	PRINT("emma_resource_exists:\n");
+	emma_resource_root_id_t root = 0;
+	emma_resource_t* resource = NULL;
+	
+	root = emma_get_root(uri);
+	if (root <= 0 || root > EMMA_NB_ROOTS) return 0;
+	else root--;
+	emma_get_resource(emma_get_name(uri), root+1, NULL, NULL, &resource);
+	
+	if (resource) return 1;
+	else return 0;
 }
 
 uint8_t emma_resource_add (emma_resource_root_id_t root, char* name)
