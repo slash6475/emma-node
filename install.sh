@@ -32,6 +32,9 @@ patch -p2 --directory=$DEST --input=$THIS/patch/cfs_patch.diff
 cp -r $THIS/src/contiki/apps/emma-node $DEST/apps/
 cp -r $THIS/src/contiki/examples/emma-node-example $DEST/examples/
 
+# Copy EMMA documentation
+cp -r $THIS/doc $DEST/../
+
 # Install compilator toolchain
 sudo apt-get install gcc-avr avr-libc avrdude
 
