@@ -94,7 +94,7 @@ void root_agent_init()
 {
 	ROOT_MEM_INIT();
 	memset(memory, 0, ROOT_AGENT_MAX_ALLOC);
-	cfs_coffee_format();
+	//cfs_coffee_format();
 }
 
 static void* root_agent_alloc()
