@@ -35,6 +35,9 @@ cp -r $THIS/src/contiki/examples/emma-node-example $DEST/examples/
 # Copy EMMA documentation
 cp -r $THIS/doc $DEST/../
 
+# Copy 'Network' script
+cp $THIS/network.sh $DEST/../
+
 # Install compilator toolchain
 sudo apt-get install gcc-avr avr-libc avrdude
 
