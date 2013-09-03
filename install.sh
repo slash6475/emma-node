@@ -24,6 +24,7 @@ patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-raven.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/patch_erbium.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/raven-main_patch.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/border-router_patch.diff
+patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-activate-control-overrun.diff
 
 # Temporary CFS patch
 patch -p2 --directory=$DEST --input=$THIS/patch/cfs_patch.diff

@@ -1,0 +1,10 @@
+diff -r emma-node/platform/avr-raven/contiki-conf.h emma-node-new/platform/avr-raven/contiki-conf.h
+336c336
+< //#define UIP_CONF_RECEIVE_WINDOW 300
+---
+> #define UIP_CONF_RECEIVE_WINDOW 300
+diff -r emma-node/platform/avr-raven/contiki-conf.h~ emma-node-new/platform/avr-raven/contiki-conf.h~
+336c336
+< #define UIP_CONF_RECEIVE_WINDOW 300
+---
+> //#define UIP_CONF_RECEIVE_WINDOW 300
