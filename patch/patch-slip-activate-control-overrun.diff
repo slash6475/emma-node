@@ -1,6 +1,6 @@
-diff -crB emma-node/platform/avr-raven/contiki-conf.h emma-node-new/platform/avr-raven/contiki-conf.h
-*** emma-node/platform/avr-raven/contiki-conf.h	2013-09-03 17:52:44.793682590 +0200
---- emma-node-new/platform/avr-raven/contiki-conf.h	2013-09-03 17:53:32.185684106 +0200
+diff -crB ./emma-node/platform/avr-raven/contiki-conf.h ./emma-node-new/platform/avr-raven/contiki-conf.h
+*** ./emma-node/platform/avr-raven/contiki-conf.h	2013-09-03 17:52:44.793682590 +0200
+--- ./emma-node-new/platform/avr-raven/contiki-conf.h	2013-09-03 17:53:32.185684106 +0200
 ***************
 *** 333,339 ****
   #define UIP_CONF_ND6_REACHABLE_TIME     600000
