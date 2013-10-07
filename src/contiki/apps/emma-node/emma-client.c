@@ -444,9 +444,13 @@ PROCESS_THREAD(emma_client_process, ev, data)
 						} // while (code && pre)
 					} // If not a ROOT resource
 				
+
 					/* Finalize (STOP everything if one failed OR if we DELETE an agent)*/
+					/* [FIXME] Comment and replace the two below line because producing infinite loop, but don't know what their function 
 					if (! previousFail) nbBytesRead = get_next_resource_name_by_root(0, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 					else nbBytesRead = 0;
+					*/
+					nbBytesRead = 0;
 				} // while(nbBytesRead && ...)
 			
 				/* ************************************* */
@@ -473,7 +477,6 @@ PROCESS_THREAD(emma_client_process, ev, data)
 			// Scheduled polling: When client is currently running.
 			if (state != EMMA_CLIENT_IDLE) process_post(PROCESS_CURRENT(), PROCESS_EVENT_CONTINUE, NULL);
 			else etimer_reset(&emma_client_timer);
-			
 		} // if (state != EMMA_CLIENT_IDLE)
 		
 		PROCESS_YIELD_UNTIL(etimer_expired(&emma_client_timer) || ev == PROCESS_EVENT_CONTINUE);
