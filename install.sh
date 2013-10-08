@@ -30,8 +30,8 @@ patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-activate-control-over
 patch -p2 --directory=$DEST --input=$THIS/patch/cfs_patch.diff
 
 # Copy EMMA application and example
-cp -r $THIS/src/contiki/apps/emma-node $DEST/apps/
-cp -r $THIS/src/contiki/examples/emma-node-example $DEST/examples/
+cp -r $THIS/src/apps/emma-node $DEST/apps/
+cp -r $THIS/src/examples/emma-node-example $DEST/examples/
 
 # Copy EMMA documentation
 cp -r $THIS/doc $DEST/../
