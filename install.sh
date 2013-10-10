@@ -17,9 +17,17 @@ else
 fi
 
 echo "Installing 'emma-node' ..."
+
+echo -e  "=========================="
+echo -e  "  Contiki installation"
+echo -e  "=========================="
 cp -R $THIS/dep/* $DEST/
+echo -e ""
 
 # Patch Contiki OS
+echo -e  "==================="
+echo -e  "  Contiki patching"
+echo -e  "==================="
 patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-raven.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/patch_erbium.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/raven-main_patch.diff
@@ -28,18 +36,29 @@ patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-activate-control-over
 
 # Temporary CFS patch
 patch -p2 --directory=$DEST --input=$THIS/patch/cfs_patch.diff
+echo -e ""
 
 # Copy EMMA application and example
+echo -e  "=========================="
+echo -e  "  emma-node installation"
+echo -e  "=========================="
 cp -r $THIS/src/apps/emma-node $DEST/apps/
 cp -r $THIS/src/examples/emma-node-example $DEST/examples/
+cp $THIS/network.sh $DEST/../
+echo -e ""
 
 # Copy EMMA documentation
+echo -e  "=========================="
+echo -e  "     doc installation"
+echo -e  "=========================="
 cp -r $THIS/doc $DEST/../
-
-# Copy 'Network' script
-cp $THIS/network.sh $DEST/../
+echo -e ""
 
 # Install compilator toolchain
+echo -e  "=========================="
+echo -e  "   Package installation"
+echo -e  "=========================="
 sudo apt-get install gcc-avr avr-libc avrdude
+echo -e ""
 
 echo "Done."
