@@ -113,6 +113,13 @@ typedef uint8_t (* repl_solver) (char* symbol);
 typedef int (* repl_getter) (char* name, uint8_t* data_block, uint16_t block_size, emma_index_t block_index);
 uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter);
 
+
+volatile emma_resource_root_id_t get_next_resource_name_by_root_rootTmp = 0;
+volatile emma_resource_t* get_next_resource_name_by_root_previous = NULL;
+volatile emma_resource_t* get_next_resource_name_by_root_current = NULL;
+volatile emma_resource_t* get_next_resource_name_by_root_next = NULL;
+
+
 void emma_client_init()
 {
 	PRINT("Starting EMMA client\n");
@@ -335,7 +342,14 @@ PROCESS_THREAD(emma_client_process, ev, data)
 										PRINT("Local address\n");
 										previousFail = 0;
 										// Send block in a local way ...
-										if (TARGETmethod == CLIENT_DELETE) {emma_resource_del(TARGETuri);}
+										if (TARGETmethod == CLIENT_DELETE) {
+											// In case of the delete is considering current agent, we reinitialize agent iterator function
+											get_next_resource_name_by_root_rootTmp = 0;
+											get_next_resource_name_by_root_previous = NULL;
+											get_next_resource_name_by_root_current = NULL;
+											get_next_resource_name_by_root_next = NULL;
+											emma_resource_del(TARGETuri);
+										}
 										else if (strncmp(TARGETuri, resource, strlen(TARGETuri)) != 0)
 										{
 											
@@ -446,10 +460,9 @@ PROCESS_THREAD(emma_client_process, ev, data)
 				
 
 					/* Finalize (STOP everything if one failed OR if we DELETE an agent)*/
-					/* [FIXME] Comment and replace the two below line because producing infinite loop, but don't know what their function 
 					if (! previousFail) nbBytesRead = get_next_resource_name_by_root(0, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 					else nbBytesRead = 0;
-					*/
+					
 					nbBytesRead = 0;
 				} // while(nbBytesRead && ...)
 			

@@ -300,72 +300,73 @@ uint8_t get_resources_number()
 	return EMMA_NB_ROOTS;
 }
 
+static emma_resource_root_id_t get_next_resource_name_by_root_rootTmp = 0;
+static emma_resource_t* get_next_resource_name_by_root_previous = NULL;
+static emma_resource_t* get_next_resource_name_by_root_current = NULL;
+static emma_resource_t* get_next_resource_name_by_root_next = NULL;
 emma_size_t get_next_resource_name_by_root(emma_resource_root_id_t root, uint8_t* block, emma_size_t block_size)
 {
-	static emma_resource_root_id_t rootTmp = 0;
-	static emma_resource_t* previous = NULL;
-	static emma_resource_t* current = NULL;
-	static emma_resource_t* next = NULL;
+
 	
 	static uint8_t found = 0;
 	emma_size_t nbBytesRead = 0;
 	
 	if (root != 0)
 	{
-		rootTmp = root-1;
-		previous = NULL;
-		current = NULL;
-		next = NULL;
+		get_next_resource_name_by_root_ = root-1;
+		get_next_resource_name_by_root_previous = NULL;
+		get_next_resource_name_by_root_current = NULL;
+		get_next_resource_name_by_root_next = NULL;
 		found = 0;
-		current = (resources_roots[rootTmp])->list;
+		get_next_resource_name_by_root_current = (resources_roots[get_next_resource_name_by_root_])->list;
 	}
 	
-	if (rootTmp < 0 || rootTmp >= EMMA_NB_ROOTS) return 0;
+	if (get_next_resource_name_by_root_ < 0 || get_next_resource_name_by_root_ >= EMMA_NB_ROOTS) return 0;
 	
-	while (current && !found)
+	while (get_next_resource_name_by_root_current && !found)
 	{
-		if (previous == current->prev)
+		if (get_next_resource_name_by_root_previous == get_next_resource_name_by_root_current->prev)
 		{
-			//previousVisit = current;
-			previous = current;
-			next = current->subRoot;
+			//previousVisit = get_next_resource_name_by_root_current;
+			get_next_resource_name_by_root_previous = get_next_resource_name_by_root_current;
+			get_next_resource_name_by_root_next = get_next_resource_name_by_root_current->subRoot;
 		}
-		if (next == NULL || previous == current->subRoot)
+		if (get_next_resource_name_by_root_next == NULL || get_next_resource_name_by_root_previous == get_next_resource_name_by_root_current->subRoot)
 		{
-			//current->nextOfResearch = previousVisit;
+			//get_next_resource_name_by_root_current->nextOfResearch = previousVisit;
 			//PRINT("[GET] RESOURCE: ");
-			//print_full_path_inverted(current);
-			//PRINTS(" ; prev=&%d", (int)current->prev);
+			//print_full_path_inverted(get_next_resource_name_by_root_current);
+			//PRINTS(" ; prev=&%d", (int)get_next_resource_name_by_root_current->prev);
 			PRINTS("\n");
 			found = 1;
-			previous = current;
-			next = current->next;
+			get_next_resource_name_by_root_previous = get_next_resource_name_by_root_current;
+			get_next_resource_name_by_root_next = get_next_resource_name_by_root_current->next;
 		}
-		if (next == NULL || previous == current->next)
+		if (get_next_resource_name_by_root_next == NULL || get_next_resource_name_by_root_previous == get_next_resource_name_by_root_current->next)
 		{
-			previous = current;
-			next = current->prev;
+			get_next_resource_name_by_root_previous = get_next_resource_name_by_root_current;
+			get_next_resource_name_by_root_next = get_next_resource_name_by_root_current->prev;
 		}
 		//previousVisit = next;
-		current = next;
+		get_next_resource_name_by_root_current = get_next_resource_name_by_root_next;
 	}
 	
 	if (found)
 	{
 		// Complete block with resource name
-		//PRINT("[GET NEXT NAME] ROOT %d\n", rootTmp);
-		//print_full_path_inverted(previous);
-		nbBytesRead = print_full_path(rootTmp+1, previous, block, block_size);
+		//PRINT("[GET NEXT NAME] ROOT %d\n", get_next_resource_name_by_root_);
+		//print_full_path_inverted(get_next_resource_name_by_root_previous);
+		nbBytesRead = print_full_path(get_next_resource_name_by_root_+1, get_next_resource_name_by_root_previous, block, block_size);
 		found = 0;
 	}
-	else if (!current)
+	else if (!get_next_resource_name_by_root_current)
 	{
 		//PRINT("END");
-		nbBytesRead = print_full_path(rootTmp+1, NULL, block, block_size);
+		nbBytesRead = print_full_path(get_next_resource_name_by_root_+1, NULL, block, block_size);
 		previous = NULL;
-		next = NULL;
+		get_next_resource_name_by_root_next = NULL;
 		rootTmp++;
-		current = (resources_roots[rootTmp])->list;
+		get_next_resource_name_by_root_current = (resources_roots[get_next_resource_name_by_root_])->list;
 	}
 	
 	return nbBytesRead;
