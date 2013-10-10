@@ -17,7 +17,7 @@ else
 fi
 
 echo "Installing 'emma-node' ..."
-cp -R $THIS/dep/contiki/* $DEST/
+cp -R $THIS/dep/* $DEST/
 
 # Patch Contiki OS
 patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-raven.diff
