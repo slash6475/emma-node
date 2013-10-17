@@ -113,13 +113,6 @@ typedef uint8_t (* repl_solver) (char* symbol);
 typedef int (* repl_getter) (char* name, uint8_t* data_block, uint16_t block_size, emma_index_t block_index);
 uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter);
 
-
-extern emma_resource_root_id_t get_next_resource_name_by_root_rootTmp = 0;
-extern emma_resource_t* get_next_resource_name_by_root_previous = NULL;
-extern emma_resource_t* get_next_resource_name_by_root_current = NULL;
-extern emma_resource_t* get_next_resource_name_by_root_next = NULL;
-extern uint8_t get_next_resource_name_by_root_found = 0;
-
 void emma_client_init()
 {
 	PRINT("Starting EMMA client\n");
@@ -344,11 +337,7 @@ PROCESS_THREAD(emma_client_process, ev, data)
 										// Send block in a local way ...
 										if (TARGETmethod == CLIENT_DELETE) {
 											// In case of the delete is considering current agent, we reinitialize agent iterator function
-											get_next_resource_name_by_root_rootTmp  = 0;
-											get_next_resource_name_by_root_previous = NULL;
-											get_next_resource_name_by_root_current  = NULL;
-											get_next_resource_name_by_root_next     = NULL;
-											get_next_resource_name_by_root_found	= 0;
+											get_next_resource_name_by_root_reset();
 											emma_resource_del(TARGETuri);
 										}
 										else if (strncmp(TARGETuri, resource, strlen(TARGETuri)) != 0)
@@ -459,10 +448,6 @@ PROCESS_THREAD(emma_client_process, ev, data)
 						} // while (code && pre)
 					} // If not a ROOT resource
 				
-printf("PLOPLOP: %d %d %d %d ",get_next_resource_name_by_root_rootTmp,
-		get_next_resource_name_by_root_previous,
-		get_next_resource_name_by_root_current,
-		get_next_resource_name_by_root_next);
 					/* Finalize (STOP everything if one failed OR if we DELETE an agent)*/
 					if (! previousFail) nbBytesRead = get_next_resource_name_by_root(0, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 					else nbBytesRead = 0;

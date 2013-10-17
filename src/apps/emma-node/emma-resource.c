@@ -308,6 +308,16 @@ uint8_t get_resources_number()
 }
 
 
+void
+get_next_resource_name_by_root_reset(){
+	get_next_resource_name_by_root_rootTmp  = 0;
+	get_next_resource_name_by_root_previous = NULL;
+	get_next_resource_name_by_root_next     = NULL;
+	get_next_resource_name_by_root_found	= 0;
+	get_next_resource_name_by_root_current = (resources_roots[get_next_resource_name_by_root_rootTmp])->list;
+
+}
+
 emma_size_t get_next_resource_name_by_root(emma_resource_root_id_t root, uint8_t* block, emma_size_t block_size)
 {
 	emma_size_t nbBytesRead = 0;

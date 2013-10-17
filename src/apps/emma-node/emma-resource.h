@@ -142,6 +142,14 @@ uint8_t get_resources_number();
 emma_size_t get_next_resource_name_by_root(emma_resource_root_id_t root, uint8_t* block, emma_size_t block_size);
 
 /**
+	* Reset tree routing of resource when we remove a resource in it.
+	*
+	* \return 
+	*
+	*/
+void get_next_resource_name_by_root_reset();
+
+/**
 	* Get the root-ID of a given URI.
 	*
 	* \param uri A NULL-terminated string representing an URI.
