@@ -62,17 +62,33 @@ RESOURCE(emma_server, METHOD_GET|METHOD_PUT|METHOD_POST|METHOD_DELETE, "\0", "ct
 PROCESS(emma_server_process, "Emma Server Process");
 PROCESS_THREAD(emma_server_process, ev, data)
 {
+  static struct etimer timer;
+  uint8_t done, i;
+  char resource[EMMA_MAX_URI_SIZE];
+
   PROCESS_BEGIN();
   PRINT("Starting Emma Server Process...\n");
-//  etimer 
-// TODO : Liberation des resources bloquées quand la connection est définitivement interrompue
-  //      => Avec un timer qui check la date de réception du dernier paquet
-  while(1) {
-    PROCESS_YIELD();
+  etimer_set(&timer, CLOCK_SECOND * EMMA_SERVER_TIMEOUT_SECOND);
 
-//	if (ev == PROCESS_EVENT_TIMER) {
-//    }
-  } /* while (1) */
+  do {
+    PROCESS_WAIT_EVENT();
+    // Check if a resource has been locked by a remote transaction which has been remotely cancelled without confirmation
+    if(ev == PROCESS_EVENT_TIMER){
+    	done = 0;
+    	do {
+    		for(i=0; i < get_resources_number(); i++){
+	    		done = get_next_resource_name_by_root(1, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
+	    		resource[done] = '\0';
+
+	      		if(emma_resource_is_locked(resource) && clock_seconds() - emma_resource_get_clocktime (resource) > 2){
+	      			PRINT("Timeout - Forced unlocking of resource %s\n", resource);
+					emma_resource_release (resource);
+   			   		}
+   			   	}
+    	} while (!done);
+      etimer_set(&timer, CLOCK_SECOND);
+    }
+  } while(1);
 
   PROCESS_END();
 }
@@ -206,7 +222,8 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 						nbBytes = emma_resource_write(uri, payload, payloadSize, block_num*blockSize);
 						if (nbBytes == payloadSize) responseCode = REST.status.OK;
 						else responseCode = REST.status.BAD_REQUEST;
-				
+						emma_resource_set_clocktime (uri, clock_seconds());
+
 						if (!more)
 						{
 							emma_resource_set_last_modified(uri, EMMA_SERVER_ID);

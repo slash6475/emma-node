@@ -671,6 +671,16 @@ uint8_t emma_resource_lock (char* uri)
 	// returns also ROOT name (ROOT name cannot be locked ...)
 }
 
+uint8_t emma_resource_is_locked(char* uri){
+	emma_resource_t* res = NULL;
+	emma_get_resource(emma_get_name(uri), emma_get_root(uri), NULL, NULL, &res);
+	if (res)
+	{
+		return (res->mutex == EMMA_MUTEX_LOCKED)?1:0;
+	}
+	return 0;
+}
+
 uint8_t emma_resource_release (char* uri)
 {
 	//PRINT("emma_resource_release:\n");
@@ -714,6 +724,27 @@ emma_resource_mutex_t emma_resource_get_last_modified (char* uri)
 		return res->lastModified;
 	}
 	else return 0;
+}
+
+void emma_resource_set_clocktime (char* uri, uint32_t clocktime)
+{
+	//PRINT("emma_resource_get_last_modified:\n");
+	emma_resource_t* res = NULL;
+	emma_get_resource(emma_get_name(uri), emma_get_root(uri), NULL, NULL, &res);
+	if (res)
+	{
+		res->clocktime = clocktime;
+	}
+}
+
+uint32_t emma_resource_get_clocktime (char* uri){
+	emma_resource_t* res = NULL;
+	emma_get_resource(emma_get_name(uri), emma_get_root(uri), NULL, NULL, &res);
+	if (res)
+	{
+		return res->clocktime;
+	}	
+	return 0;
 }
 
 uint8_t emma_resource_get_index_of_pattern(char* uri, char* pattern, emma_index_t* start, emma_index_t* stop)

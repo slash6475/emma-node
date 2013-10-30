@@ -87,7 +87,7 @@ typedef struct EmmaResource {
 	struct EmmaResource *next;
 	struct EmmaResource *prev;
 	struct EmmaResource *subRoot;
-
+	uint32_t clocktime;
 } emma_resource_t;
 
 typedef struct {
@@ -302,6 +302,15 @@ int emma_resource_write (char* uri, uint8_t* data_block, emma_size_t block_size,
 uint8_t emma_resource_lock (char* uri);
 
 /**
+	* Evaluate if an EMMA resource is locked (embedded MUTEX).
+	*
+	* \param uri A NULL-terminated string that represents the URI of the resource
+	*
+	* \return 1 if locked, 0 otherwise.
+	*/
+uint8_t emma_resource_is_locked(char* uri);
+
+/**
 	* Release an EMMA resource (embedded MUTEX).
 	*
 	* \param uri A NULL-terminated string that represents the URI of the resource
@@ -329,6 +338,24 @@ void emma_resource_set_last_modified (char* uri, emma_resource_mutex_t key);
 	* \return An opaque value to identify the resource modifier.
 	*/
 emma_resource_mutex_t emma_resource_get_last_modified (char* uri);
+
+/**
+	* Set the last time in which the resource has been modified.
+	*
+	* \param uri A NULL-terminated string that represents the URI of the resource
+	*
+	* \return
+	*/
+void emma_resource_set_clocktime (char* uri, uint32_t clocktime);
+
+/**
+	* Get the last time in which the resource has been modified.
+	*
+	* \param uri A NULL-terminated string that represents the URI of the resource
+	*
+	* \return The clocktime value 
+	*/
+uint32_t emma_resource_get_clocktime (char* uri);
 
 /**
 	* Get the index of pattern matched in resource.

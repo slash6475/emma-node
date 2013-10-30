@@ -69,6 +69,8 @@
 #define EMMA_SERVER_ID		1		// Process ID used to specify the resource modifier
 #define EMMA_CLIENT_ID		2		// Process ID used to specify the resource modifier
 
+#define EMMA_SERVER_TIMEOUT_SECOND 3
+
 /* Tests on configuration (do not modify) */
 #if GDEBUG | CLIENT_DEBUG | SERVER_DEBUG | RESOURCE_DEBUG
 	#ifndef OUTPUT_METHOD
