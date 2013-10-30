@@ -87,6 +87,7 @@ typedef struct EmmaResource {
 	struct EmmaResource *next;
 	struct EmmaResource *prev;
 	struct EmmaResource *subRoot;
+
 } emma_resource_t;
 
 typedef struct {

@@ -321,12 +321,6 @@ get_next_resource_name_by_root_reset(){
 emma_size_t get_next_resource_name_by_root(emma_resource_root_id_t root, uint8_t* block, emma_size_t block_size)
 {
 	emma_size_t nbBytesRead = 0;
-
-
-	printf("ICI : %d %d %d %d ",get_next_resource_name_by_root_rootTmp,
-		get_next_resource_name_by_root_previous,
-		get_next_resource_name_by_root_current,
-		get_next_resource_name_by_root_next);
 	
 	if (root != 0)
 	{

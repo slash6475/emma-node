@@ -57,6 +57,28 @@ MEMB(emma_server_resources_R, resource_t, EMMA_MAX_RESOURCES);
 RESOURCE(emma_well_known_core, METHOD_GET, ".well-known/core", "ct=40");
 RESOURCE(emma_server, METHOD_GET|METHOD_PUT|METHOD_POST|METHOD_DELETE, "\0", "ct=40");
 
+
+/*********************/
+PROCESS(emma_server_process, "Emma Server Process");
+PROCESS_THREAD(emma_server_process, ev, data)
+{
+  PROCESS_BEGIN();
+  PRINT("Starting Emma Server Process...\n");
+//  etimer 
+// TODO : Liberation des resources bloquées quand la connection est définitivement interrompue
+  //      => Avec un timer qui check la date de réception du dernier paquet
+  while(1) {
+    PROCESS_YIELD();
+
+//	if (ev == PROCESS_EVENT_TIMER) {
+//    }
+  } /* while (1) */
+
+  PROCESS_END();
+}
+
+/********************/
+
 void emma_server_init()
 {
 	EMMA_RESOURCE_MEM_INIT();
@@ -81,6 +103,9 @@ void emma_server_init()
   
   // Enable EMMA default resource
   rest_activate_resource(&resource_emma_server);
+
+  // Start Emma Server Process
+  process_start(&emma_server_process, NULL);
 }
 
 void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
@@ -110,7 +135,7 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 	uriSize = REST.get_url (request, (const char **)(&pUri));
 	rq_flag = REST.get_method_type(request);
 	
-	PRINT("Handler\n");
+	//PRINT("Handler\n");
 	if (uriSize && uriSize<EMMA_MAX_URI_SIZE)
 	{
 		memcpy(uri, pUri, uriSize);

@@ -109,7 +109,11 @@ eval_status_t client_solver (uint8_t* reference, uint8_t referenceSize, operand_
 void emma_client_chunk_callback(void *response);
 uint8_t getNextTARGET(char* resource, uint8_t* method, uip_ipaddr_t* address, uint16_t* port, char uri[EMMA_MAX_URI_SIZE]);
 uint16_t getNextPOST(char* resource, uint8_t* block, uint16_t blockSize, uint8_t* type);
+
+// Function pointer to return boolean test resource existence on node (identified by name) (use 'emma_resource_read')
 typedef uint8_t (* repl_solver) (char* symbol);
+
+// Function pointer to read a resource on node (identified by name) (use 'emma_resource_read')
 typedef int (* repl_getter) (char* name, uint8_t* data_block, uint16_t block_size, emma_index_t block_index);
 uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter);
 
@@ -233,11 +237,11 @@ PROCESS_THREAD(emma_client_process, ev, data)
 					
 						// Get TARGET and send POST
 						TARGETmethod = 0;
-						PRINT("1\n");
+						//PRINT("1\n");
 						code = getNextTARGET(resource, &TARGETmethod, &TARGETadd, &TARGETport, TARGETuri);
-						PRINT("2\n");
+						//PRINT("2\n");
 						if (code) code = emma_resource_get_index_of_pattern(resource, "$POST", &POSTstartIndex, &POSTstopIndex);
-						PRINT("3\n");
+						//PRINT("3\n");
 						POSTstartIndex++; // Skip starting '['
 					
 						while (code && pre)
@@ -507,6 +511,17 @@ uint8_t isLocalAddress(uip_ipaddr_t* address)
 {
 #if UIP_CONF_IPV6
 	uint8_t addressCnt = 0;
+	uip_ipaddr_t loopback;
+
+	for (addressCnt=0 ; addressCnt<15 ; addressCnt++)
+		loopback.u8[addressCnt] = 0;
+    loopback.u8[15] = 1;
+
+	// If it's me
+	if(addressCMP(address, &(loopback)) == 0)
+		return 1;
+
+	//
 	for (addressCnt=0 ; addressCnt<UIP_DS6_ADDR_NB ; addressCnt++)
 	{
     if (uip_ds6_if.addr_list[addressCnt].isused && addressCMP(address, &(uip_ds6_if.addr_list[addressCnt].ipaddr)) == 0)
@@ -819,15 +834,15 @@ typedef enum {
 
 void printState(repl_state_t state)
 {
-	if (state == REPL_RAZ) 											{PRINT("[PRINT STATE] RAZ\n");}
+	if (state == REPL_RAZ) 								{PRINT("[PRINT STATE] RAZ\n");}
 	else if (state == REPL_FILL_BUFFER) 				{PRINT("[PRINT STATE] FILL BUFFER\n");}
 	else if (state == REPL_SHIFT_BUFFER) 				{PRINT("[PRINT STATE] SHIFT BUFFER\n");}
-	else if (state == REPL_ANALYZE) 			{PRINT("[PRINT STATE] ANALYZE\n");}
+	else if (state == REPL_ANALYZE) 					{PRINT("[PRINT STATE] ANALYZE\n");}
 	else if (state == REPL_COPY_BUFFER) 				{PRINT("[PRINT STATE] COPY BUFFER\n");}
 	else if (state == REPL_COPY_OPERAND) 				{PRINT("[PRINT STATE] COPY OPERAND\n");}
-	else if (state == REPL_ERROR) 							{PRINT("[PRINT STATE] ERROR\n");}
-	else if (state == REPL_END)									{PRINT("[PRINT STATE] END\n");}
-	else 																				{PRINT("[PRINT STATE] Unknown\n");}
+	else if (state == REPL_ERROR) 						{PRINT("[PRINT STATE] ERROR\n");}
+	else if (state == REPL_END)							{PRINT("[PRINT STATE] END\n");}
+	else 												{PRINT("[PRINT STATE] Unknown\n");}
 }
 
 
@@ -904,7 +919,9 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			}
 		}
 		
-		// FILL BUFFER
+		/* FILL BUFFER
+		Copy data from resource into free buffer space
+		*/
 		else if (currentState == REPL_FILL_BUFFER)
 		{
 			if (bufferIndex < REPL_BUFFER)
@@ -925,7 +942,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 					buffer[cnt] = '\0';
 					*block -= (nbBytesRead - cnt);
 					*block+=1;
-					//PRINT("EOB FOUND ; readIndex=%d\n", *block);
+					PRINT("EOB FOUND ; readIndex=%d\n", *block);
 				}
 				
 				
@@ -935,7 +952,9 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			else currentState = REPL_ERROR;
 		}
 		
-		// ANALYZE
+		/* ANALYZE
+		Look for operators and operands, select 
+		*/
 		else if (currentState == REPL_ANALYZE)
 		{
 			find_operator(buffer, strlen((char*)buffer), &bufferIndex);
@@ -957,6 +976,8 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		else if (currentState == REPL_COPY_BUFFER)
 		{
 			cnt=copyIndex;
+			
+			// Skip copy buffer to output if there is a local variable to replace
 			while ((cnt<=bufferIndex) && (outputIndex<outputSize) && (buffer[cnt] != '\0'))
 			{
 				//PRINT("%c-", buffer[cnt]);
@@ -976,6 +997,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		// COPY OPERAND
 		else if (currentState == REPL_COPY_OPERAND)
 		{
+
 			if (solver(ref)) nbBytesRead = getter(ref, output+outputIndex, outputSize-outputIndex, refIndex);
 			else nbBytesRead = getter(NULL, output+outputIndex, outputSize-outputIndex, refIndex);
 			refIndex += nbBytesRead;
@@ -983,8 +1005,8 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			
 			// Search end of block character
 			cnt = 0;
-			while ((cnt < outputIndex) && (output[cnt] != REPL_EOB)) cnt++;
-			if (output[cnt] == REPL_EOB) outputIndex = cnt;
+//			while ((cnt < outputIndex) && (output[cnt] != REPL_EOB)) cnt++;
+//			if (output[cnt] == REPL_EOB) outputIndex = cnt;
 			
 			if (outputIndex == outputSize) {outputCond = 1;}
 			else
