@@ -1,0 +1,601 @@
+Seulement dans emma-node/apps: emma-node
+diff -ur src/emma-node/dep/apps/erbium/erbium.c emma-node/apps/erbium/erbium.c
+--- src/emma-node/dep/apps/erbium/erbium.c	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/erbium/erbium.c	2013-10-17 14:26:55.059721140 +0200
+@@ -76,7 +76,7 @@
+ void
+ rest_activate_resource(resource_t* resource)
+ {
+-  PRINTF("Activating: %s", resource->url);
++  PRINTF("Activating: %s\n", resource->url);
+ 
+   if (!resource->pre_handler)
+   {
+@@ -90,6 +90,13 @@
+   list_add(restful_services, resource);
+ }
+ 
++void rest_disable_resource(resource_t* resource)
++{
++	PRINTF("Disabling: %s\n", resource->url);
++	
++	list_remove(restful_services, resource);
++}
++
+ void
+ rest_activate_periodic_resource(periodic_resource_t* periodic_resource)
+ {
+@@ -148,22 +155,44 @@
+ {
+   uint8_t found = 0;
+   uint8_t allowed = 0;
++  
++  int resourceUrlLen = 0;
++  int requestUrlLen = 0;
+ 
+-  PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
++  //PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
+ 
+   resource_t* resource = NULL;
++  resource_t* defaultResource = NULL;
+   const char *url = NULL;
+ 
++	requestUrlLen = REST.get_url(request, &url);
++	PRINTF("[ERBIUM] Handling request on resource: '");
++	for(resourceUrlLen=0 ; resourceUrlLen<requestUrlLen ; resourceUrlLen++) PRINTF("%c-", url[resourceUrlLen]);
++	PRINTF("'.\n");
++	//PRINTF("[ERBIUM] toto.\n");
++	// Looking for resource associated with the exact request URL
++	
++	rest_resource_flags_t method = REST.get_method_type(request);
++	
+   for (resource = (resource_t*)list_head(restful_services); resource; resource = resource->next)
+   {
++    resourceUrlLen = strlen(resource->url);
++    if (resourceUrlLen == 0) defaultResource = resource;
++    
++    
+     /*if the web service handles that kind of requests and urls matches*/
+-    if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES)))
+-        && strncmp(resource->url, url, strlen(resource->url)) == 0)
++    //if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES))) && strncmp(resource->url, url, strlen(resource->url)) == 0)
++    //if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If resource exists
++    
++    if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, requestUrlLen) == 0)) // swap in strcmp
++    
++    //if ((requestUrlLen == resourceUrlLen) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If exact resource exists
+     {
+       found = 1;
+-      rest_resource_flags_t method = REST.get_method_type(request);
+ 
+-      PRINTF("method %u, resource->flags %u\n", (uint16_t)method, resource->flags);
++      PRINTF("method %u, resource->flags %02X\n", (uint16_t)method, resource->flags);
++      //if (resource->flags & HAS_SUB_RESOURCES) PRINTF("[ERBIUM] HAS SUB-RESOURCES\n");
++			//else PRINTF("[ERBIUM] FLAGS: %02X\n", resource->flags);
+ 
+       if (resource->flags & method)
+       {
+@@ -186,11 +215,35 @@
+       }
+       break;
+     }
+-  }
++  }  
++	
++	if (!found && defaultResource)
++	{
++		if (defaultResource->flags & method)
++    {
++      found = 1;
++      allowed = 1;
+ 
+-  if (!found) {
+-    REST.set_response_status(response, REST.status.NOT_FOUND);
+-  }
++      /*call pre handler if it exists*/
++      if (!defaultResource->pre_handler || defaultResource->pre_handler(defaultResource, request, response))
++      {
++        /* call handler function*/
++        defaultResource->handler(request, response, buffer, buffer_size, offset);
++
++        /*call post handler if it exists*/
++        if (defaultResource->post_handler)
++        {
++          defaultResource->post_handler(defaultResource, request, response);
++        }
++      }
++    } else {
++      REST.set_response_status(response, REST.status.METHOD_NOT_ALLOWED);
++    }
++	}
++	else if (!found)
++	{
++		REST.set_response_status(response, REST.status.NOT_FOUND);
++	}
+ 
+   return found & allowed;
+ }
+diff -ur src/emma-node/dep/apps/erbium/erbium.h emma-node/apps/erbium/erbium.h
+--- src/emma-node/dep/apps/erbium/erbium.h	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/erbium/erbium.h	2013-10-17 14:26:55.059721140 +0200
+@@ -294,6 +294,7 @@
+  * Resources wanted to be accessible should be activated with the following code.
+  */
+ void rest_activate_resource(resource_t* resource);
++void rest_disable_resource(resource_t* resource);
+ void rest_activate_periodic_resource(periodic_resource_t* periodic_resource);
+ void rest_activate_event_resource(resource_t* resource);
+ 
+diff -ur src/emma-node/dep/apps/er-coap-07/er-coap-07.c emma-node/apps/er-coap-07/er-coap-07.c
+--- src/emma-node/dep/apps/er-coap-07/er-coap-07.c	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/er-coap-07/er-coap-07.c	2014-01-14 14:31:01.873121646 +0100
+@@ -282,6 +282,21 @@
+ {
+   return ++current_mid;
+ }
++
++/*-----------------------------------------------------------------------------------*/
++void
++coap_set_current_mid(uint16_t mid)
++{
++  printf("Setting new MID %d\n", mid);
++  current_mid = mid;
++}
++
++uint16_t coap_get_current_mid()
++{
++  return current_mid;
++}
++
++
+ /*-----------------------------------------------------------------------------------*/
+ /*- MEASSAGE PROCESSING -------------------------------------------------------------*/
+ /*-----------------------------------------------------------------------------------*/
+diff -ur src/emma-node/dep/apps/er-coap-07/er-coap-07-engine.c emma-node/apps/er-coap-07/er-coap-07-engine.c
+--- src/emma-node/dep/apps/er-coap-07/er-coap-07-engine.c	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/er-coap-07/er-coap-07-engine.c	2014-01-17 16:01:03.784844730 +0100
+@@ -44,7 +44,7 @@
+ 
+ #include "er-coap-07-engine.h"
+ 
+-#define DEBUG 0 
++#define DEBUG 0
+ #if DEBUG
+ #define PRINTF(...) printf(__VA_ARGS__)
+ #define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
+@@ -148,7 +148,7 @@
+           if (service_cbk)
+           {
+             /* Call REST framework and check if found and allowed. */
+-            if (service_cbk(message, response, transaction->packet+COAP_MAX_HEADER_SIZE, block_size, &new_offset))
++            if (service_cbk(message, response, transaction->packet+COAP_MAX_HEADER_SIZE, block_size, &new_offset) != -1)
+             {
+               if (coap_error_code==NO_ERROR)
+               {
+@@ -197,6 +197,14 @@
+               } /* no errors/hooks */
+             } /* successful service callback */
+ 
++            // If user application don't want answer, just drop transaction
++            if(response->mid == -1) {
++              PRINTF("Cancel transaction by user application\n");
++              coap_transaction_t* t = coap_get_transaction_by_mid(message->mid);
++              coap_clear_transaction(t);
++              return NO_ERROR;
++              }
++
+             /* Serialize response. */
+             if (coap_error_code==NO_ERROR)
+             {
+diff -ur src/emma-node/dep/apps/er-coap-07/er-coap-07.h emma-node/apps/er-coap-07/er-coap-07.h
+--- src/emma-node/dep/apps/er-coap-07/er-coap-07.h	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/er-coap-07/er-coap-07.h	2014-01-14 11:52:55.521274978 +0100
+@@ -248,10 +248,15 @@
+ } coap_packet_t;
+ 
+ 
++
+ /* To store error code and human-readable payload */
+ extern coap_status_t coap_error_code;
+ extern char *coap_error_message;
+ 
++void coap_set_current_mid(uint16_t mid);
++
++uint16_t coap_get_current_mid();
++
+ void coap_init_connection(uint16_t port);
+ uint16_t coap_get_mid(void);
+ 
+diff -ur src/emma-node/dep/core/cfs/cfs-coffee.c emma-node/core/cfs/cfs-coffee.c
+--- src/emma-node/dep/core/cfs/cfs-coffee.c	2013-10-17 14:26:11.607721844 +0200
++++ emma-node/core/cfs/cfs-coffee.c	2013-10-17 14:26:55.063721140 +0200
+@@ -44,7 +44,8 @@
+  */
+ 
+ #include <limits.h>
+-#include <string.h>
++//#include <string.h>
++#include "cooja-string.h"
+ 
+ #define DEBUG 0
+ #if DEBUG
+diff -ur src/emma-node/dep/core/cfs/cfs-posix-dir.c emma-node/core/cfs/cfs-posix-dir.c
+--- src/emma-node/dep/core/cfs/cfs-posix-dir.c	2013-10-17 14:26:11.607721844 +0200
++++ emma-node/core/cfs/cfs-posix-dir.c	2013-10-17 14:26:55.063721140 +0200
+@@ -35,7 +35,8 @@
+ 
+ #include <stdio.h>
+ #include <dirent.h>
+-#include <string.h>
++//#include <string.h>
++#include "cooja-string.h"
+ 
+ #include "cfs/cfs.h"
+ 
+diff -ur src/emma-node/dep/core/cfs/cfs-ram.c emma-node/core/cfs/cfs-ram.c
+--- src/emma-node/dep/core/cfs/cfs-ram.c	2013-10-17 14:26:11.607721844 +0200
++++ emma-node/core/cfs/cfs-ram.c	2013-10-17 14:26:55.063721140 +0200
+@@ -33,7 +33,8 @@
+  * $Id: cfs-ram.c,v 1.10 2009/02/27 14:25:38 nvt-se Exp $
+  */
+ 
+-#include <string.h>
++//#include <string.h>
++#include "cooja-string.h"
+ 
+ #include "cfs/cfs.h"
+ 
+Seulement dans emma-node/core/cfs: cooja-string.c
+Seulement dans emma-node/core/cfs: cooja-string.h
+diff -ur src/emma-node/dep/cpu/avr/Makefile.avr emma-node/cpu/avr/Makefile.avr
+--- src/emma-node/dep/cpu/avr/Makefile.avr	2013-10-17 14:26:11.635721842 +0200
++++ emma-node/cpu/avr/Makefile.avr	2013-10-17 14:26:55.067721140 +0200
+@@ -52,7 +52,7 @@
+   endif
+  endif
+  COFFEE_ADDRESS1 = $(shell echo $$(( $(COFFEE_ADDRESS) + 1 )))
+- CONTIKI_TARGET_SOURCEFILES += cfs-coffee.c cfs-coffee-arch.c 
++ CONTIKI_TARGET_SOURCEFILES += cfs-coffee.c cfs-coffee-arch.c cooja-string.c
+  CFLAGS += -DCOFFEE_FILES=$(COFFEE_FILES) -DCOFFEE_ADDRESS=$(COFFEE_ADDRESS)
+  ifneq ($(COFFEE_ADDRESS), DEFAULT)
+   LDFLAGS+= -Wl,--section-start=.coffeefiles=$(COFFEE_ADDRESS)
+Seulement dans emma-node/examples: emma-node-example
+Seulement dans emma-node/examples/er-rest-example: contiki-avr-raven.a
+Seulement dans emma-node/examples/er-rest-example: contiki-avr-raven.map
+Seulement dans emma-node/examples/er-rest-example: er-example-server.avr-raven
+Seulement dans emma-node/examples/er-rest-example: obj_avr-raven
+Seulement dans emma-node/examples/er-rest-example: obj_native
+Seulement dans emma-node/examples/ipv6/rpl-border-router: border-router.avr-raven
+Seulement dans emma-node/examples/ipv6/rpl-border-router: contiki-avr-raven.a
+Seulement dans emma-node/examples/ipv6/rpl-border-router: contiki-avr-raven.map
+Seulement dans emma-node/examples/ipv6/rpl-border-router: obj_avr-raven
+diff -ur src/emma-node/dep/examples/ipv6/rpl-border-router/project-conf.h emma-node/examples/ipv6/rpl-border-router/project-conf.h
+--- src/emma-node/dep/examples/ipv6/rpl-border-router/project-conf.h	2013-10-17 14:26:11.683721843 +0200
++++ emma-node/examples/ipv6/rpl-border-router/project-conf.h	2014-01-14 15:50:03.233045009 +0100
+@@ -44,6 +44,8 @@
+ #define UIP_CONF_BUFFER_SIZE    140
+ #endif
+ 
++#define UIP_CONF_DS6_ROUTE_NBU 10
++ 
+ #ifndef UIP_CONF_RECEIVE_WINDOW
+ #define UIP_CONF_RECEIVE_WINDOW  60
+ #endif
+@@ -52,4 +54,7 @@
+ #define WEBSERVER_CONF_CFS_CONNS 2
+ #endif
+ 
++#undef NETSTACK_CONF_RDC
++#define NETSTACK_CONF_RDC     nullrdc_driver
++
+ #endif /* __PROJECT_ROUTER_CONF_H__ */
+diff -ur src/emma-node/dep/platform/avr-raven/contiki-conf.h emma-node/platform/avr-raven/contiki-conf.h
+--- src/emma-node/dep/platform/avr-raven/contiki-conf.h	2013-10-17 14:26:11.699721841 +0200
++++ emma-node/platform/avr-raven/contiki-conf.h	2014-01-14 15:44:16.225050618 +0100
+@@ -186,7 +186,7 @@
+ #define UIP_CONF_TCP_SPLIT       1
+ #define UIP_CONF_DHCP_LIGHT      1
+ 
+-#if 0 /* No radio cycling */
++#if 0 /* No radio cycling */
+ 
+ #define NETSTACK_CONF_MAC         nullmac_driver
+ #define NETSTACK_CONF_RDC         sicslowmac_driver
+@@ -333,7 +333,7 @@
+ #define UIP_CONF_ND6_REACHABLE_TIME     600000
+ #define UIP_CONF_ND6_RETRANS_TIMER      10000
+ /* For slow slip connections, to prevent buffer overruns */
+-//#define UIP_CONF_RECEIVE_WINDOW 300
++#define UIP_CONF_RECEIVE_WINDOW 300
+ #undef UIP_CONF_FWCACHE_SIZE
+ #define UIP_CONF_FWCACHE_SIZE    30
+ #define UIP_CONF_BROADCAST       1
+@@ -343,48 +343,48 @@
+ 
+ #endif /* RPL */
+ 
+-#else /* UIP_CONF_IPV6 */
+-
+-/* Network setup for non-IPv6 (rime). */
+-#define NETSTACK_CONF_NETWORK rime_driver
+-#define RIMEADDR_CONF_SIZE        2
+-#define NETSTACK_CONF_MAC         nullmac_driver
+-//#define NETSTACK_CONF_RDC         nullrdc_driver
+-#define NETSTACK_CONF_RDC         contikimac_driver
+-#define NETSTACK_CONF_FRAMER      framer_802154
+-#define NETSTACK_CONF_RADIO       rf230_driver
+-#define CHANNEL_802_15_4          26
+-#define RADIO_CONF_CALIBRATE_INTERVAL 256
+-#define RF230_CONF_AUTOACK        1
+-#define RF230_CONF_AUTORETRIES    3
+-#define RF230_CONF_CSMARETRIES    5
+-#define RF230_CONF_CCA_THRES    -85
+-#define UIP_CONF_WAIT_TIMEOUT     5
+-#define QUEUEBUF_CONF_NUM         16
+-
+-#define COLLECT_CONF_ANNOUNCEMENTS       1
+-#define CXMAC_CONF_ANNOUNCEMENTS         0
+-#define XMAC_CONF_ANNOUNCEMENTS          0
+-#define CONTIKIMAC_CONF_ANNOUNCEMENTS    0
+-
+-#ifndef COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS
+-#define COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS     32
+-#endif /* COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS */
+-
+-#ifndef TIMESYNCH_CONF_ENABLED
+-#define TIMESYNCH_CONF_ENABLED           0
+-#endif /* TIMESYNCH_CONF_ENABLED */
+-
+-//#if TIMESYNCH_CONF_ENABLED
+-/* CC2420 SDF timestamps must be on if timesynch is enabled. */
+-//#undef CC2420_CONF_SFD_TIMESTAMPS
+-//#define CC2420_CONF_SFD_TIMESTAMPS       1
+-//#endif /* TIMESYNCH_CONF_ENABLED */
+-
+-#endif /* UIP_CONF_IPV6 */
+-
+-
+-
++#else /* UIP_CONF_IPV6 */
++
++/* Network setup for non-IPv6 (rime). */
++#define NETSTACK_CONF_NETWORK rime_driver
++#define RIMEADDR_CONF_SIZE        2
++#define NETSTACK_CONF_MAC         nullmac_driver
++//#define NETSTACK_CONF_RDC         nullrdc_driver
++#define NETSTACK_CONF_RDC         contikimac_driver
++#define NETSTACK_CONF_FRAMER      framer_802154
++#define NETSTACK_CONF_RADIO       rf230_driver
++#define CHANNEL_802_15_4          26
++#define RADIO_CONF_CALIBRATE_INTERVAL 256
++#define RF230_CONF_AUTOACK        1
++#define RF230_CONF_AUTORETRIES    3
++#define RF230_CONF_CSMARETRIES    5
++#define RF230_CONF_CCA_THRES    -85
++#define UIP_CONF_WAIT_TIMEOUT     5
++#define QUEUEBUF_CONF_NUM         16
++
++#define COLLECT_CONF_ANNOUNCEMENTS       1
++#define CXMAC_CONF_ANNOUNCEMENTS         0
++#define XMAC_CONF_ANNOUNCEMENTS          0
++#define CONTIKIMAC_CONF_ANNOUNCEMENTS    0
++
++#ifndef COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS
++#define COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS     32
++#endif /* COLLECT_NEIGHBOR_CONF_MAX_COLLECT_NEIGHBORS */
++
++#ifndef TIMESYNCH_CONF_ENABLED
++#define TIMESYNCH_CONF_ENABLED           0
++#endif /* TIMESYNCH_CONF_ENABLED */
++
++//#if TIMESYNCH_CONF_ENABLED
++/* CC2420 SDF timestamps must be on if timesynch is enabled. */
++//#undef CC2420_CONF_SFD_TIMESTAMPS
++//#define CC2420_CONF_SFD_TIMESTAMPS       1
++//#endif /* TIMESYNCH_CONF_ENABLED */
++
++#endif /* UIP_CONF_IPV6 */
++
++
++
+ #define CCIF
+ #define CLIF
+ 
+Seulement dans emma-node/platform/avr-raven: contiki-conf.h~
+diff -ur src/emma-node/dep/platform/avr-raven/contiki-raven-main.c emma-node/platform/avr-raven/contiki-raven-main.c
+--- src/emma-node/dep/platform/avr-raven/contiki-raven-main.c	2013-10-17 14:26:11.699721841 +0200
++++ emma-node/platform/avr-raven/contiki-raven-main.c	2014-01-14 15:36:19.877058317 +0100
+@@ -39,7 +39,7 @@
+ #define PRINTA(...)
+ #endif
+ 
+-#define DEBUG 1
++#define DEBUG 1
+ #if DEBUG
+ #define PRINTD(FORMAT,args...) printf_P(PSTR(FORMAT),##args)
+ #else
+@@ -47,7 +47,7 @@
+ #endif
+ 
+ /* Track interrupt flow through mac, rdc and radio driver */
+-#define DEBUGFLOWSIZE 32
++#define DEBUGFLOWSIZE 32
+ #if DEBUGFLOWSIZE
+ unsigned char debugflowsize,debugflow[DEBUGFLOWSIZE];
+ #define DEBUGFLOW(c) if (debugflowsize<(DEBUGFLOWSIZE-1)) debugflow[debugflowsize++]=c
+@@ -116,7 +116,7 @@
+ #define PERIODICPRINTS 1
+ #if PERIODICPRINTS
+ //#define PINGS 64
+-#define ROUTES 600
++#define ROUTES 60
+ #define STAMPS 60
+ #define STACKMONITOR 600
+ uint32_t clocktime;
+@@ -127,7 +127,7 @@
+ void rtimercycle(void) {rtimerflag=1;}
+ #endif
+ #endif
+-uint16_t node_id = 0;
++uint16_t node_id = 0;
+ 
+ /*-------------------------------------------------------------------------*/
+ /*----------------------Configuration of the .elf file---------------------*/
+@@ -266,17 +266,17 @@
+       PRINTA("Random EUI64 address generated\n");
+   }
+  
+-#if UIP_CONF_IPV6
+-  PRINTD("Initial node_id %u\n",node_id);
+-  if (node_id) {
+-    addr.u8[3]=node_id&0xff;
+-    addr.u8[4]=(node_id&0xff)>>8;  
+-    addr.u8[5]=node_id;
+-    addr.u8[6]=node_id;
+-    addr.u8[7]=node_id;
+-  } else {
+-    node_id=addr.u8[7]+(addr.u8[6]<<8);
+-  }
++#if UIP_CONF_IPV6
++  PRINTD("Initial node_id %u\n",node_id);
++  if (node_id) {
++    addr.u8[3]=node_id&0xff;
++    addr.u8[4]=(node_id&0xff)>>8;  
++    addr.u8[5]=node_id;
++    addr.u8[6]=node_id;
++    addr.u8[7]=node_id;
++  } else {
++    node_id=addr.u8[7]+(addr.u8[6]<<8);
++  }
+   memcpy(&uip_lladdr.addr, &addr.u8, sizeof(rimeaddr_t));
+   rimeaddr_set_node_addr(&addr);  
+   rf230_set_pan_addr(params_get_panid(),params_get_panaddr(),(uint8_t *)&addr.u8);
+@@ -350,7 +350,8 @@
+ 
+   /*---If using coffee file system create initial web content if necessary---*/
+ #if COFFEE_FILES
+-  int fa = cfs_open( "/index.html", CFS_READ);
++// NM commented
++/*  int fa = cfs_open( "/index.html", CFS_READ);
+   if (fa<0) {     //Make some default web content
+     PRINTA("No index.html file found, creating upload.html!\n");
+     PRINTA("Formatting FLASH file system for coffee...");
+@@ -360,9 +361,11 @@
+     int r = cfs_write(fa, &"It works!", 9);
+     if (r<0) PRINTA("Can''t create /index.html!\n");
+     cfs_close(fa);
++    
++    
+ //  fa = cfs_open("upload.html"), CFW_WRITE);
+ // <html><body><form action="upload.html" enctype="multipart/form-data" method="post"><input name="userfile" type="file" size="50" /><input value="Upload" type="submit" /></form></body></html>
+-  }
++  }//*/
+ #endif /* COFFEE_FILES */
+ 
+ /* Add addresses for testing */
+@@ -478,7 +481,7 @@
+ #if DEBUGFLOWSIZE
+   if (debugflowsize) {
+     debugflow[debugflowsize]=0;
+-    PRINTF("%s\n",debugflow);
++    PRINTF("%s\n",debugflow);
+     debugflowsize=0;
+    }
+ #endif
+@@ -524,7 +527,7 @@
+ #endif
+ 
+ #if ROUTES && UIP_CONF_IPV6
+-if ((clocktime%ROUTES)==2) {
++if ((clocktime%ROUTES)==0) {
+       
+ extern uip_ds6_nbr_t uip_ds6_nbr_cache[];
+ extern uip_ds6_route_t uip_ds6_routing_table[];
+@@ -592,12 +595,12 @@
+ #endif
+ 
+ #if RF230BB&&0
+-extern uint8_t rf230interruptflag;
+-    if (rf230interruptflag) {
+- //   if (rf230interruptflag!=11) {
+-        PRINTF("**RI%u\n",rf230interruptflag);
++extern uint8_t rf230interruptflag;
++    if (rf230interruptflag) {
++ //   if (rf230interruptflag!=11) {
++        PRINTF("**RI%u\n",rf230interruptflag);
+  //   }
+-      rf230interruptflag=0;
++      rf230interruptflag=0;
+     }
+ #endif
+   }
+diff -ur src/emma-node/dep/platform/avr-raven/slip_uart0.c emma-node/platform/avr-raven/slip_uart0.c
+--- src/emma-node/dep/platform/avr-raven/slip_uart0.c	2013-10-17 14:26:11.699721841 +0200
++++ emma-node/platform/avr-raven/slip_uart0.c	2013-10-17 14:26:55.055721141 +0200
+@@ -33,9 +33,9 @@
+ 
+ /**
+  * \file
+- *         Machine dependent AVR SLIP routines for UART0.
++ *         SLIP routine for AVR platforms
+  * \author
+- *         Kasun Hewage <kasun.ch@gmail.com>
++ *         Nicolas Mardegan <mardegan@ece.fr>
+  */
+ 
+ #include <stdio.h>
+@@ -44,50 +44,10 @@
+ #include "slip.h"
+ 
+ /*---------------------------------------------------------------------------*/
+-static int
+-slip_putchar(char c, FILE *stream)
+-{
+-#define SLIP_END 0300
+-  static char debug_frame = 0;
+-
+-  if (!debug_frame) {        /* Start of debug output */
+-    slip_arch_writeb(SLIP_END);
+-    slip_arch_writeb('\r'); /* Type debug line == '\r' */
+-    debug_frame = 1;
+-  }
+-
+-  slip_arch_writeb((unsigned char)c);
+-          
+-  /*
+-   * Line buffered output, a newline marks the end of debug output and
+-   * implicitly flushes debug output.         
+-   */
+-  if (c == '\n') {
+-    slip_arch_writeb(SLIP_END);
+-    debug_frame = 0;
+-  }
+-
+-  return c;
+-}
+-/*---------------------------------------------------------------------------*/
+-static FILE slip_stdout = FDEV_SETUP_STREAM(slip_putchar, NULL,
+-                                            _FDEV_SETUP_WRITE);
+-/*---------------------------------------------------------------------------*/
+ void
+ slip_arch_init(unsigned long ubr)
+ {
+-  rs232_set_input(RS232_PORT_0, slip_input_byte);
+-  stdout = &slip_stdout;
++  rs232_init(SLIP_PORT, BAUD_RATE(ubr), USART_PARITY_NONE|USART_STOP_BITS_1|USART_DATA_BITS_8);
++  rs232_set_input(SLIP_PORT, slip_input_byte);
+ }
+ /*---------------------------------------------------------------------------*/
+-/*
+- XXX:
+-      Currently, the following function is in cpu/avr/dev/rs232.c file. this
+-      should be moved to here from there hence this is a platform specific slip 
+-      related function. 
+-void
+-slip_arch_writeb(unsigned char c)
+-{
+-  rs232_send(RS232_PORT_0, c);
+-}
+-*/
+Seulement dans emma-node/: platform.tar.gz
+Seulement dans emma-node/tools: tunslip6
