@@ -653,19 +653,19 @@ operator_t* find_operator(uint8_t* block, uint8_t blockSize, uint8_t* lastComput
 
 void eval_print_status (eval_status_t status)
 {
-	if (status == EVAL_READY) 										{PRINT("[STATUS] EVAL_READY.\n");}
-	else if (status == EVAL_COMPLETE) 						{PRINT("[STATUS] EVAL_COMPLETE.\n");}
+	if (status == EVAL_READY) 						{PRINT("[STATUS] EVAL_READY.\n");}
+	else if (status == EVAL_COMPLETE) 				{PRINT("[STATUS] EVAL_COMPLETE.\n");}
 	else if (status == EVAL_OPERAND_LIFO_OVF) 		{PRINT("[STATUS] EVAL_COMPLETE.\n");}
 	else if (status == EVAL_OPERATOR_LIFO_OVF) 		{PRINT("[STATUS] EVAL_OPERATOR_LIFO_OVF.\n");}
-	else if (status == EVAL_RESULT_OVF) 					{PRINT("[STATUS] EVAL_RESULT_OVF.\n");}
-	else if (status == EVAL_PARSE_ERROR) 					{PRINT("[STATUS] EVAL_PARSE_ERROR.\n");}
-	else if (status == EVAL_INVALID_ARG) 					{PRINT("[STATUS] EVAL_INVALID_ARG.\n");}
+	else if (status == EVAL_RESULT_OVF) 			{PRINT("[STATUS] EVAL_RESULT_OVF.\n");}
+	else if (status == EVAL_PARSE_ERROR) 			{PRINT("[STATUS] EVAL_PARSE_ERROR.\n");}
+	else if (status == EVAL_INVALID_ARG) 			{PRINT("[STATUS] EVAL_INVALID_ARG.\n");}
 	else if (status == EVAL_OPERAND_PARSE_ERROR) 	{PRINT("[STATUS] EVAL_OPERAND_PARSE_ERROR.\n");}
-	else if (status == EVAL_BAD_OPERATOR) 				{PRINT("[ERROR] EVAL_BAD_OPERATOR.\n");}
-	else if (status == EVAL_EMPTY_OPERAND) 				{PRINT("[ERROR] EVAL_EMPTY_OPERAND.\n");}
-	else if (status == EVAL_OPERATE_ERROR) 				{PRINT("[ERROR] EVAL_OPERATE_ERROR.\n");}
-	else if (status == EVAL_DIV_BY_ZERO) 					{PRINT("[ERROR] EVAL_DIV_BY_ZERO.\n");}
-	else {PRINT("[STATUS] Unknown status code %d.\n", status);}
+	else if (status == EVAL_BAD_OPERATOR) 			{PRINT("[ERROR] EVAL_BAD_OPERATOR.\n");}
+	else if (status == EVAL_EMPTY_OPERAND) 			{PRINT("[ERROR] EVAL_EMPTY_OPERAND.\n");}
+	else if (status == EVAL_OPERATE_ERROR) 			{PRINT("[ERROR] EVAL_OPERATE_ERROR.\n");}
+	else if (status == EVAL_DIV_BY_ZERO) 			{PRINT("[ERROR] EVAL_DIV_BY_ZERO.\n");}
+	else 											{PRINT("[STATUS] Unknown status code %d.\n", status);}
 }
 void eval_print_stack(num_eval_t* stack)
 {

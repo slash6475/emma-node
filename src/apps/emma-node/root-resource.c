@@ -97,7 +97,7 @@ eval_status_t root_resource_solver (uint8_t* reference, uint8_t referenceSize, o
 	}
 	else return EVAL_INVALID_ARG;
 }
-
+ 
 void root_resource_init()
 {
 	ROOT_MEM_INIT();
@@ -144,7 +144,7 @@ int root_resource_write(void* user_data, uint8_t* data_block, emma_size_t block_
 	err = evaluate_block(&root_resource_stack, data_block, block_size, NULL);
 	if (err == EVAL_READY)
 	{
-		PRINT("[EMMA RES] Invalid resource.\n");
+		PRINT("[EMMA RES] Nothing to compute.\n");
 		//eval_print_status(err);
 		return block_size;
 	}

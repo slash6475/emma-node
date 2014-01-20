@@ -23,7 +23,7 @@
 #include "cfs/cfs-coffee.h"
 #include <string.h>
 
-#define LDEBUG 0
+#define LDEBUG 1
 #if (LDEBUG | GDEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[ROOT AGENT] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)
@@ -184,7 +184,8 @@ int root_agent_write(void* user_data, uint8_t* data_block, emma_size_t block_siz
 	int nbBytesWritten = 0;
 	cfs_offset_t offset = 0;
 	
-	if (block_index < agent->size) return 0; // Do not write multiple times the same block !!
+	//printf("ICI0 %d,%d"block_index,agent->size);
+	//if (block_index < agent->size) return 0; // Do not write multiple times the same block !!
 	
 	// Verify block
 	if (root_agent_analyze_block(agent, data_block, block_size, block_index) != 0)

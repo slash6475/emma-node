@@ -21,7 +21,7 @@
 #define TRUE	1
 #define FALSE	0
 #define DYNAMIC 1
-#define STATIC 0
+#define STATIC  0
 
 #include "contiki.h"
 
@@ -64,12 +64,13 @@
 
 /* EMMA Constants */
 #define EMMA_MAX_RESOURCES 18 //(3*5 + 3roots)
-#define EMMA_MAX_URI_SIZE 32 // (4*8 <=> depth of 4)
+#define EMMA_MAX_URI_SIZE  32 // (4*8 <=> depth of 4)
 #define	EMMA_NOBODY_ID		0		// Nobody process ID
 #define EMMA_SERVER_ID		1		// Process ID used to specify the resource modifier
 #define EMMA_CLIENT_ID		2		// Process ID used to specify the resource modifier
 
-#define EMMA_SERVER_TIMEOUT_SECOND 3
+#define EMMA_SERVER_TIMEOUT_SECOND 		20
+#define EMMA_CLIENT_POLLING_INTERVAL	5
 
 /* Tests on configuration (do not modify) */
 #if GDEBUG | CLIENT_DEBUG | SERVER_DEBUG | RESOURCE_DEBUG

@@ -18,6 +18,16 @@
 #ifndef __EMMA_CLIENT_H_INCLUDED__
 #define __EMMA_CLIENT_H_INCLUDED__
 
+enum {
+	EMMA_CLIENT_WAITING_MUTEX,
+	EMMA_CLIENT_RUNNING,
+	EMMA_CLIENT_IDLE,
+	EMMA_CLIENT_START,
+	EMMA_CLIENT_RELEASE
+};
+
+uint8_t emma_client_state();
+
 void emma_client_init();
 
 #endif // __EMMA_CLIENT_H_INCLUDED__

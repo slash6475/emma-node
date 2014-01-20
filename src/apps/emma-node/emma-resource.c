@@ -348,7 +348,7 @@ emma_size_t get_next_resource_name_by_root(emma_resource_root_id_t root, uint8_t
 			//PRINT("[GET] RESOURCE: ");
 			//print_full_path_inverted(get_next_resource_name_by_root_current);
 			//PRINTS(" ; prev=&%d", (int)get_next_resource_name_by_root_current->prev);
-			PRINTS("\n");
+
 			get_next_resource_name_by_root_found = 1;
 			get_next_resource_name_by_root_previous = get_next_resource_name_by_root_current;
 			get_next_resource_name_by_root_next = get_next_resource_name_by_root_current->next;
@@ -543,6 +543,7 @@ uint8_t emma_resource_add (emma_resource_root_id_t root, char* name)
 			else
 			{
 				// Cannot add resource
+				PRINT("RESOURCE NAME IS NOT BASIC\n");
 				return 5;
 			}
 		}
@@ -562,6 +563,9 @@ uint8_t emma_resource_del (char* uri)
 	emma_resource_t* resource = NULL;
 	emma_resource_t* previousResource = NULL;
 	
+	// In case of the delete is considering current agent, we reinitialize agent iterator function
+	get_next_resource_name_by_root_reset();
+
 	root = emma_get_root(uri);
 	
 	if (root <= 0 || root > EMMA_NB_ROOTS) return 1; // No associated root !!!
@@ -645,7 +649,7 @@ int emma_resource_write (char* uri, uint8_t* data_block, emma_size_t block_size,
 	
 	if (resource)
 	{
-		PRINT("[WRITE] '%s'\n", resource->name);
+		PRINT("[WRITING] '%s'\n", resource->name);
 		if ((resources_roots[root])->write) return (resources_roots[root])->write(resource->data, data_block, block_size, block_index);
 		else return 0;
 	}
@@ -654,20 +658,22 @@ int emma_resource_write (char* uri, uint8_t* data_block, emma_size_t block_size,
 
 uint8_t emma_resource_lock (char* uri)
 {
-	PRINT("emma_resource_lock:\n");
+	PRINT("emma_resource_lock: for %s : ", uri);
 	emma_resource_t* res = NULL;
 	emma_get_resource(emma_get_name(uri), emma_get_root(uri), NULL, NULL, &res);
 	if (res)
 	{
-		if (res->mutex == EMMA_MUTEX_LOCKED) {return 0;}
+		if (res->mutex == EMMA_MUTEX_LOCKED) ;
 		else if (res->mutex == EMMA_MUTEX_RELEASED)
 		{
+			PRINT("[DONE]\n");
 			res->mutex = EMMA_MUTEX_LOCKED;
 			return 1;
 		}
-		else {return 0;}
+		else ;
 	}
-	else return 0; // For compatibility reasons with function 'emma_resource_get_next_name_by_root' which
+	PRINT("[REFUSE]\n");
+	return 0; // For compatibility reasons with function 'emma_resource_get_next_name_by_root' which
 	// returns also ROOT name (ROOT name cannot be locked ...)
 }
 
@@ -784,14 +790,14 @@ int emma_resource_open(char* uri)
 	if (root <= 0 || root > EMMA_NB_ROOTS) return 0;
 	else root--;
 	emma_get_resource(emma_get_name(uri), root+1, NULL, NULL, &resource);
-	
 	if (resource)
 	{
 		PRINT("[OPEN] '%s'\n", resource->name);
 		if ((resources_roots[root])->open) return (resources_roots[root])->open(resource->data);
-		else return 1;
+		return 1;
 	}
-	else return 0;
+	
+	return -1;
 }
 
 int emma_resource_close(char* uri)

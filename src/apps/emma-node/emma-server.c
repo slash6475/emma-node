@@ -18,6 +18,9 @@
 #include "emma-conf.h"
 #include "erbium.h"
 #include "er-coap-07.h"
+#include "er-coap-07-transactions.h"
+
+#include "emma-client.h"
 #include "emma-server.h"
 #include "emma-resource.h"
 
@@ -58,6 +61,9 @@ RESOURCE(emma_well_known_core, METHOD_GET, ".well-known/core", "ct=40");
 RESOURCE(emma_server, METHOD_GET|METHOD_PUT|METHOD_POST|METHOD_DELETE, "\0", "ct=40");
 
 
+uint8_t opened = 0;
+uint8_t locked = 0;
+
 /*********************/
 PROCESS(emma_server_process, "Emma Server Process");
 PROCESS_THREAD(emma_server_process, ev, data)
@@ -68,33 +74,54 @@ PROCESS_THREAD(emma_server_process, ev, data)
 
   PROCESS_BEGIN();
   PRINT("Starting Emma Server Process...\n");
-  etimer_set(&timer, CLOCK_SECOND * EMMA_SERVER_TIMEOUT_SECOND);
+  etimer_set(&timer, EMMA_SERVER_TIMEOUT_SECOND * CLOCK_SECOND);
 
   do {
     PROCESS_WAIT_EVENT();
-    // Check if a resource has been locked by a remote transaction which has been remotely cancelled without confirmation
+
+	/*
+	----------------------------------------------------------------------
+	WATCHDOG for deadlock
+	----------------------------------------------------------------------
+	*/
     if(ev == PROCESS_EVENT_TIMER){
     	done = 0;
     	do {
     		for(i=0; i < get_resources_number(); i++){
-	    		done = get_next_resource_name_by_root(1, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
+	    		done = get_next_resource_name_by_root(i, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 	    		resource[done] = '\0';
 
-	      		if(emma_resource_is_locked(resource) && clock_seconds() - emma_resource_get_clocktime (resource) > 2){
+	      		if(emma_resource_is_locked(resource) && 
+	      			clock_seconds() - emma_resource_get_clocktime (resource) > EMMA_SERVER_TIMEOUT_SECOND &&
+	      			emma_client_state() == EMMA_CLIENT_IDLE)
+	      		{
+
 	      			PRINT("Timeout - Forced unlocking of resource %s\n", resource);
-					emma_resource_release (resource);
-   			   		}
+
+					if (!emma_resource_del(resource))
+						emma_resource_set_last_modified(NULL, EMMA_SERVER_ID);
+
+					else {
+						PRINT("Timeout - Unable to delete partial resource %s\n", resource);
+						emma_resource_release(resource);
+						}
+					opened = 0;
+					locked = 0;
+   			   		} 
    			   	}
     	} while (!done);
-      etimer_set(&timer, CLOCK_SECOND);
+      etimer_set(&timer, EMMA_SERVER_TIMEOUT_SECOND * CLOCK_SECOND);
     }
   } while(1);
 
   PROCESS_END();
 }
 
-/********************/
-
+/*
+----------------------------------------------------------------------
+EMMA SERVER INITIALIZATION
+----------------------------------------------------------------------
+*/
 void emma_server_init()
 {
 	EMMA_RESOURCE_MEM_INIT();
@@ -124,6 +151,12 @@ void emma_server_init()
   process_start(&emma_server_process, NULL);
 }
 
+
+/*
+----------------------------------------------------------------------
+SERVER HANDLER for GET/PUT/POST/DELETE method on EMMA resources
+----------------------------------------------------------------------
+*/
 void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
 	// Variables
@@ -134,15 +167,16 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 	rest_resource_flags_t rq_flag;
 	emma_size_t nbBytes = 0;
 	uint8_t emmaCode = 0;
-	
+
+	uint8_t i = 0;
+	static unsigned long long  count;
+
 	// For PUT method only
 	uint32_t block_num = 0;
 	uint8_t more = 0;
 	int payloadSize = 0;
 	uint8_t* payload = NULL;
 	uint16_t blockSize = 0;
-	static uint8_t opened = 0;
-	static uint8_t locked = 0;
 	
 	// DEBUG only
 	uint16_t dCnt = 0;
@@ -156,6 +190,11 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 	{
 		memcpy(uri, pUri, uriSize);
 		uri[uriSize] = '\0';
+		/*
+		----------------------------------------------------------------------
+		RESOURCE OPENING
+		----------------------------------------------------------------------
+		*/
 		if (rq_flag & METHOD_GET)
 		{
 			if (emma_resource_lock(uri))
@@ -186,7 +225,12 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 				responseCode = REST.status.SERVICE_UNAVAILABLE;
 			}
 		}
-		else if (rq_flag & METHOD_PUT)
+		/*
+		----------------------------------------------------------------------
+		RESOURCE CREATION AND EDITION
+		----------------------------------------------------------------------
+		*/
+		else if ((rq_flag & METHOD_PUT) || (rq_flag & METHOD_POST))
 		{
 			// Retrieve block number if any
 			if (coap_get_header_block1(request, &block_num, &more, &blockSize, NULL))
@@ -201,17 +245,81 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 				block_num = 0;
 				more = 0;
 			}
-			
-			// Put payload into resource
+			/* 
+			----------------------------------------------------------------------
+			EXIT POST METHOD if RESOURCE ALREADY EXIST
+			----------------------------------------------------------------------
+			If POST method and resource is already existing, 
+			we drop the request without responding,
+			because if it is a multi-cast request,
+			it avoids to close multicast transaction for other nodes
+			*/
+
+			if((rq_flag & METHOD_POST) && emma_resource_open(uri) != -1 && !locked){
+				PRINT("[HANDLER] Resource already exist, drop request !\n");
+				((coap_packet_t*)response)->mid = -1;
+				return;
+				responseCode = REST.status.UNAUTHORIZED;
+			}
+			/*----------------------------------------------------------------------*/
+
+			/* 
+			----------------------------------------------------------------------
+			RESOURCE CREATION OR EDITION
+			----------------------------------------------------------------------
+			*/
 			payloadSize = REST.get_request_payload(request, &payload);
 			if (payloadSize)
 			{
+				/*
+				First packet initialize the resource and add it in resource tree memory
+				*/
 				if (block_num == 0)
 				{
+					if(locked){
+						PRINT("%s is locked by another transaction\n", uri);
+						((coap_packet_t*)response)->mid = -1;
+						return;
+						responseCode = REST.status.SERVICE_UNAVAILABLE;						
+					}
+
+					count = 0;
 					emma_resource_add(emma_get_resource_root(uri), emma_get_resource_name(uri));
-					if (!locked) locked = emma_resource_lock(uri);
-					if(!opened) opened = emma_resource_open(uri);
+					if (!locked)  locked = emma_resource_lock(uri);
+					if (!opened)  opened = emma_resource_open(uri);
 				}
+
+				/*
+				----------------------------------------------------------------------
+				EXIT TRANSACTION if LOOSING PACKET
+				----------------------------------------------------------------------
+				If we lost a packet of object transaction, 
+				we release the resource because it is incomplete,
+				and close transaction without reponding anything to the sender.
+
+				This is done in case of several multicast transactions received on the same object.
+				*/
+				if(block_num - count > 1){
+					PRINT("[HANDLER] Lost packet => Cancel transaction\n");
+					if (!emma_resource_del(uri))
+						emma_resource_set_last_modified(NULL, EMMA_SERVER_ID);
+
+					else {
+						PRINT("Timeout - Unable to delete partial resource %s\n", uri);
+						emma_resource_release(uri);
+						}
+					opened = 0;
+					locked = 0;	
+					((coap_packet_t*)response)->mid = -1;
+					return;
+					}
+
+				/*
+				----------------------------------------------------------------------
+				RESOURCE WRITING in PERMANENT MEMORY
+				----------------------------------------------------------------------
+				The resource is stored at the resource type offset address + num_block*(size_block)
+				*/
 				if (locked)
 				{
 					if (opened)
@@ -220,8 +328,15 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 						for(dCnt=0 ; dCnt<payloadSize ; dCnt++) PRINTS("%c",(char)(payload[dCnt]));
 						PRINTS("'\n");
 						nbBytes = emma_resource_write(uri, payload, payloadSize, block_num*blockSize);
-						if (nbBytes == payloadSize) responseCode = REST.status.OK;
-						else responseCode = REST.status.BAD_REQUEST;
+						if (nbBytes == payloadSize) {
+							PRINT("Resource writing [SUCCESS]\n");
+							responseCode = REST.status.OK;
+						}
+						else {
+							PRINT("Resource writing [FAILED]\n");
+							responseCode = REST.status.BAD_REQUEST;
+						}
+
 						emma_resource_set_clocktime (uri, clock_seconds());
 
 						if (!more)
@@ -229,20 +344,65 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 							emma_resource_set_last_modified(uri, EMMA_SERVER_ID);
 							emma_resource_close(uri);
 							emma_resource_release(uri); locked = 0;
+
+							if((rq_flag & METHOD_POST))
+								responseCode = REST.status.CREATED;
+
+							/*
+							Check if the the agent is uncompleted and then delete it
+							*
+
+							for(i=0; i < block_num || i > 63; i++)
+								if(!(count & (1<<i))){
+									PRINT("[HANDLER] Lost packet (%d) or too many packet (64) => Cancel transaction\n", i);
+									if (!emma_resource_del(uri))
+										emma_resource_set_last_modified(NULL, EMMA_SERVER_ID);
+
+									else {
+										PRINT("Timeout - Unable to delete partial resource %s\n", uri);
+										emma_resource_release(uri);
+										}
+									opened = 0;
+									locked = 0;	
+									((coap_packet_t*)response)->mid = -1;
+									return;
+									}
+									*/
 						}
 					}
 					else
 					{
 						PRINT("[HANDLER] Cannot open resource\n");
 						emma_resource_release(uri); locked = 0;
+						/*
+						----------------------------------------------------------------------
+						EXIT TRANSACTION if RESOURCE cannot be opened
+						----------------------------------------------------------------------
+						It exist the transaction,
+						if the resource is unavailable due to not enough memory,
+						without responding if it is a broadcast packet.
+						*/
+						((coap_packet_t*)response)->mid = -1;
+						return;
 						responseCode = REST.status.SERVICE_UNAVAILABLE;
 					}
 				}
 				else
 				{
-					PRINT("[HANDLER] Resource locked\n");
+					PRINT("[HANDLER] Resource locked by %d\n", emma_resource_get_last_modified(uri) );
 					if (opened) {emma_resource_close(uri); opened = 0;}
 					else PRINT("[HANDLER] Cannot open resource\n");
+
+					/*
+					----------------------------------------------------------------------
+					EXIT TRANSACTION if RESOURCE LOCKED
+					----------------------------------------------------------------------
+					It exist the transaction,
+					if the resource is locked by the webclient process,
+					without responding if it is a broadcast packet.
+					*/
+					((coap_packet_t*)response)->mid = -1;
+					return;
 					responseCode = REST.status.SERVICE_UNAVAILABLE;
 				}
 			}
@@ -258,22 +418,12 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 				responseCode = REST.status.BAD_REQUEST;
 			}
 		}
-		else if (rq_flag & METHOD_POST)
-		{
-			PRINT("[HANDLER] POST '%s'\n", uri);
-			emmaCode = emma_resource_add(emma_get_resource_root(uri), emma_get_resource_name(uri));
-			if(emmaCode==0)
-			{
-				emma_resource_set_last_modified(uri, EMMA_SERVER_ID);
-				responseCode = REST.status.CREATED;
-			}
-			else
-			{
-				// TODO: Adapt error code according to the return value of 'emma_resource_add()'
-				PRINT("Code: %d\n", emmaCode);
-				responseCode = REST.status.UNAUTHORIZED;
-			}
-		}
+
+		/* 
+		----------------------------------------------------------------------
+		RESOURCE DELETION
+		----------------------------------------------------------------------
+		*/
 		else if (rq_flag & METHOD_DELETE)
 		{
 			if (emma_resource_lock(uri))
@@ -299,6 +449,9 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 				responseCode = REST.status.SERVICE_UNAVAILABLE;
 			}
 		}
+		/*
+		----------------------------------------------------------------------
+		*/
 		else responseCode = REST.status.METHOD_NOT_ALLOWED;
 	}
 	else
@@ -308,8 +461,10 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 		responseCode = REST.status.NOT_FOUND;
 	}
 	
-	//responseCode = REST.status.METHOD_NOT_ALLOWED;
 	REST.set_response_status(response, responseCode);
+	//count |= 1<<block_num;
+	//printf("COUNT : 0x%08.8X\n", count);
+	count = block_num;
 }
 
 // Simple ".well-known/core" implementation without filtering

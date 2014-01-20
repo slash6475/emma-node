@@ -23,7 +23,7 @@
 #include "er-coap-07.h"
 #include "er-coap-07-engine.h"
 
-#define LDEBUG 0
+#define LDEBUG 1
 #if (LDEBUG | GDEBUG | CLIENT_DEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[EMMA CLIENT] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)
@@ -40,17 +40,8 @@
 #define CLIENT_POST	3
 #define CLIENT_DELETE	4
 
-#define EMMA_CLIENT_POLLING_INTERVAL	5
 
 PROCESS(emma_client_process, "EMMA client process");
-
-enum {
-	EMMA_CLIENT_WAITING_MUTEX,
-	EMMA_CLIENT_RUNNING,
-	EMMA_CLIENT_IDLE,
-	EMMA_CLIENT_START,
-	EMMA_CLIENT_RELEASE
-};
 
 // Resource management
 static struct etimer emma_client_timer;
@@ -60,6 +51,8 @@ static emma_size_t nbBytesRead = 0;
 static emma_resource_root_id_t agentsRoot = 0;
 static emma_index_t startIndex = 0;
 static emma_index_t stopIndex = 0;
+
+extern uint16_t node_id;
 
 // PRE evaluation
 eval_status_t err;
@@ -99,6 +92,7 @@ static uint8_t POSTmore = 0;
 //uint8_t POSTtype = 0;
 //uint16_t POSTblockcnt = 0;
 
+uip_ipaddr_t Broadcastaddr;
 
 static coap_packet_t request[1];
 static uint8_t sendOK = 0;
@@ -109,6 +103,7 @@ eval_status_t client_solver (uint8_t* reference, uint8_t referenceSize, operand_
 void emma_client_chunk_callback(void *response);
 uint8_t getNextTARGET(char* resource, uint8_t* method, uip_ipaddr_t* address, uint16_t* port, char uri[EMMA_MAX_URI_SIZE]);
 uint16_t getNextPOST(char* resource, uint8_t* block, uint16_t blockSize, uint8_t* type);
+static uint8_t addressCMP(uip_ipaddr_t* address1, uip_ipaddr_t* address2);
 
 // Function pointer to return boolean test resource existence on node (identified by name) (use 'emma_resource_read')
 typedef uint8_t (* repl_solver) (char* symbol);
@@ -125,6 +120,10 @@ void emma_client_init()
 	process_start(&emma_client_process, NULL);
 }
 
+uint8_t emma_client_state(){
+	return state;
+}
+
 PROCESS_THREAD(emma_client_process, ev, data)
 {
 	PROCESS_BEGIN();
@@ -139,14 +138,14 @@ PROCESS_THREAD(emma_client_process, ev, data)
 			// If a resource has been modified OR if the last run was not successful for all agents
 			if ((emma_resource_get_last_modified(NULL) != EMMA_CLIENT_ID) || (previousFail == 1))
 			{
-				//PRINT("Waking up !\n");
+				PRINT("Waking up !\n");
 				state = EMMA_CLIENT_START;
 				previousFail = 0;
 				process_post(PROCESS_CURRENT(), PROCESS_EVENT_CONTINUE, NULL);
 			}
 			else
 			{
-				//PRINT("Sleeping for %d seconds ...\n", EMMA_CLIENT_POLLING_INTERVAL);
+				PRINT("Sleeping for %d seconds ...\n", EMMA_CLIENT_POLLING_INTERVAL);
 				etimer_reset(&emma_client_timer);
 			}
 		}
@@ -322,11 +321,11 @@ PROCESS_THREAD(emma_client_process, ev, data)
 									// Prepare CoAP packet (XXX: All CoAP method not implemented !)
 									if (TARGETmethod == CLIENT_GET) coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
 									else if (TARGETmethod == CLIENT_PUT) coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
-									else if (TARGETmethod == CLIENT_POST) coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
+									else if (TARGETmethod == CLIENT_POST) coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
 									else if (TARGETmethod == CLIENT_DELETE) coap_init_message(request, COAP_TYPE_CON, COAP_DELETE, 0);
 									else coap_init_message(request, COAP_TYPE_CON, COAP_PUT, 0);
 									coap_set_header_uri_path(request, TARGETuri);
-									
+
 									if ((POSTnbBytesRead == EMMA_CLIENT_BUFFER_SIZE) && (!POSTlastPacket)) POSTmore = 1;
 									else POSTmore = 0;
 									
@@ -340,8 +339,6 @@ PROCESS_THREAD(emma_client_process, ev, data)
 										previousFail = 0;
 										// Send block in a local way ...
 										if (TARGETmethod == CLIENT_DELETE) {
-											// In case of the delete is considering current agent, we reinitialize agent iterator function
-											get_next_resource_name_by_root_reset();
 											emma_resource_del(TARGETuri);
 										}
 										else if (strncmp(TARGETuri, resource, strlen(TARGETuri)) != 0)
@@ -394,13 +391,23 @@ PROCESS_THREAD(emma_client_process, ev, data)
 									{
 										PRINT("Network address\n");
 										sendOK = 0;
+
+                  // TODO : No ACK If it is a broadcast but it is required when there are several blocks
+//                  uip_ip6addr(&Broadcastaddr, 0xff02, 0, 0, 0, 0, 0, 0, 0x0002);
+//                  if(!addressCMP(&Broadcastaddr, &TARGETadd))
+//									  ((coap_packet_t *)request)->type = COAP_TYPE_NON;
+										if(POSTblockNum == 0){
+											random_init(clock_seconds()*node_id);
+											coap_set_current_mid(random_rand());
+										}
+
 										if (pre) COAP_BLOCKING_REQUEST(&TARGETadd, TARGETport, request, emma_client_chunk_callback);
 										if (!sendOK && pre)
 										{
 											PRINT("Chunk #%d not distributed !\n", POSTblockNum);
 											//PRINT("TODO: Set timer to retry in a few seconds, trying with next agent ...\n");
-											pre = 0;
-											previousFail = 1; // Force (<=> even if no resource changed) RUN of agents on next evaluation
+											pre = 1;//0;
+											previousFail = 0; //1; // Force (<=> even if no resource changed) RUN of agents on next evaluation
 											break;
 										}
 										else
@@ -448,7 +455,8 @@ PROCESS_THREAD(emma_client_process, ev, data)
 							TARGETmethod = 0;
 							if (! previousFail) code = getNextTARGET(NULL, &TARGETmethod, &TARGETadd, &TARGETport, TARGETuri);
 							else code = 0;
-							PRINT("Next target found !\n");
+							if(code)
+								PRINT("Next target found !\n");
 						} // while (code && pre)
 					} // If not a ROOT resource
 				
