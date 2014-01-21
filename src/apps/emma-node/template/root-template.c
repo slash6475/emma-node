@@ -39,38 +39,38 @@ MEMB(root_template_R, root_template_t, ROOT_TEMPLATE_MAX_ALLOC);
 
 void root_template_init() {ROOT_MEM_INIT();}
 static void* root_template_alloc() {return ROOT_ALLOC(0);}
-void root_template_free(void* data) {ROOT_FREE(data);}
+void root_template_free(char* uri, void* data) {ROOT_FREE(data);}
 
 void root_template_reset(void* data)
 {
 	((root_template_t*)data)->value = 0;
 }
 
-int root_template_open(void* data)
+int root_template_open(char* uri, void* data)
 {
 	PRINT("[OPEN] Not implemented\n");
 	return 0;
 }
 
-int root_template_write(void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+int root_template_write(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	PRINT("[WRITE] Not implemented\n");
 	return 0;
 }
 
-int root_template_read(void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+int root_template_read(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	PRINT("[READ] Not implemented\n");
 	return 0;
 }
 
-int root_template_close(void* data)
+int root_template_close(char* uri, void* data)
 {
 	PRINT("[CLOSE] Not implemented\n");
 	return 0;
 }
 
-uint8_t root_template_regex(void* user_data, char* pattern, emma_index_t* start, emma_index_t* stop)
+uint8_t root_template_regex(char* uri, void* user_data, char* pattern, emma_index_t* start, emma_index_t* stop)
 {
 	PRINT("[REGEX] Not implemented\n");
 	return 0;
