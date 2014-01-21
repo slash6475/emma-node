@@ -1,167 +1,208 @@
-diff -crB ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.c ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.c
-*** ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.c	2012-06-20 07:11:38.000000000 +0200
---- ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.c	2013-07-01 08:53:10.913161484 +0200
-***************
-*** 76,82 ****
-  void
-  rest_activate_resource(resource_t* resource)
-  {
-!   PRINTF("Activating: %s", resource->url);
-  
-    if (!resource->pre_handler)
-    {
---- 76,82 ----
-  void
-  rest_activate_resource(resource_t* resource)
-  {
-!   PRINTF("Activating: %s\n", resource->url);
-  
-    if (!resource->pre_handler)
-    {
-***************
-*** 90,95 ****
---- 90,102 ----
-    list_add(restful_services, resource);
-  }
-  
-+ void rest_disable_resource(resource_t* resource)
-+ {
-+ 	PRINTF("Disabling: %s\n", resource->url);
-+ 	
-+ 	list_remove(restful_services, resource);
-+ }
-+ 
-  void
-  rest_activate_periodic_resource(periodic_resource_t* periodic_resource)
-  {
-***************
-*** 148,169 ****
-  {
-    uint8_t found = 0;
-    uint8_t allowed = 0;
-  
-!   PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
-  
-    resource_t* resource = NULL;
-    const char *url = NULL;
-  
-    for (resource = (resource_t*)list_head(restful_services); resource; resource = resource->next)
-    {
-      /*if the web service handles that kind of requests and urls matches*/
-!     if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES)))
-!         && strncmp(resource->url, url, strlen(resource->url)) == 0)
-      {
-        found = 1;
--       rest_resource_flags_t method = REST.get_method_type(request);
-  
-!       PRINTF("method %u, resource->flags %u\n", (uint16_t)method, resource->flags);
-  
-        if (resource->flags & method)
-        {
---- 155,198 ----
-  {
-    uint8_t found = 0;
-    uint8_t allowed = 0;
-+   
-+   int resourceUrlLen = 0;
-+   int requestUrlLen = 0;
-  
-!   //PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
-  
-    resource_t* resource = NULL;
-+   resource_t* defaultResource = NULL;
-    const char *url = NULL;
-  
-+ 	requestUrlLen = REST.get_url(request, &url);
-+ 	PRINTF("[ERBIUM] Handling request on resource: '");
-+ 	for(resourceUrlLen=0 ; resourceUrlLen<requestUrlLen ; resourceUrlLen++) PRINTF("%c-", url[resourceUrlLen]);
-+ 	PRINTF("'.\n");
-+ 	//PRINTF("[ERBIUM] toto.\n");
-+ 	// Looking for resource associated with the exact request URL
-+ 	
-+ 	rest_resource_flags_t method = REST.get_method_type(request);
-+ 	
-    for (resource = (resource_t*)list_head(restful_services); resource; resource = resource->next)
-    {
-+     resourceUrlLen = strlen(resource->url);
-+     if (resourceUrlLen == 0) defaultResource = resource;
-+     
-+     
-      /*if the web service handles that kind of requests and urls matches*/
-!     //if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES))) && strncmp(resource->url, url, strlen(resource->url)) == 0)
-!     //if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If resource exists
-!     
-!     if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, requestUrlLen) == 0)) // swap in strcmp
-!     
-!     //if ((requestUrlLen == resourceUrlLen) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If exact resource exists
-      {
-        found = 1;
-  
-!       PRINTF("method %u, resource->flags %02X\n", (uint16_t)method, resource->flags);
-!       //if (resource->flags & HAS_SUB_RESOURCES) PRINTF("[ERBIUM] HAS SUB-RESOURCES\n");
-! 			//else PRINTF("[ERBIUM] FLAGS: %02X\n", resource->flags);
-  
-        if (resource->flags & method)
-        {
-***************
-*** 186,196 ****
-        }
-        break;
-      }
-!   }
-  
-!   if (!found) {
-!     REST.set_response_status(response, REST.status.NOT_FOUND);
-!   }
-  
-    return found & allowed;
-  }
---- 215,249 ----
-        }
-        break;
-      }
-!   }  
-! 	
-! 	if (!found && defaultResource)
-! 	{
-! 		if (defaultResource->flags & method)
-!     {
-!       found = 1;
-!       allowed = 1;
-  
-!       /*call pre handler if it exists*/
-!       if (!defaultResource->pre_handler || defaultResource->pre_handler(defaultResource, request, response))
-!       {
-!         /* call handler function*/
-!         defaultResource->handler(request, response, buffer, buffer_size, offset);
-! 
-!         /*call post handler if it exists*/
-!         if (defaultResource->post_handler)
-!         {
-!           defaultResource->post_handler(defaultResource, request, response);
-!         }
-!       }
-!     } else {
-!       REST.set_response_status(response, REST.status.METHOD_NOT_ALLOWED);
-!     }
-! 	}
-! 	else if (!found)
-! 	{
-! 		REST.set_response_status(response, REST.status.NOT_FOUND);
-! 	}
-  
-    return found & allowed;
-  }
-diff -crB ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.h ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.h
-*** ./cooja-avrora-patch-wip-davidkopf_ori/apps/erbium/erbium.h	2012-06-20 07:11:38.000000000 +0200
---- ./cooja-avrora-patch-wip-davidkopf/apps/erbium/erbium.h	2013-03-19 11:28:19.264095980 +0100
-***************
-*** 294,299 ****
---- 294,300 ----
-   * Resources wanted to be accessible should be activated with the following code.
-   */
-  void rest_activate_resource(resource_t* resource);
-+ void rest_disable_resource(resource_t* resource);
-  void rest_activate_periodic_resource(periodic_resource_t* periodic_resource);
-  void rest_activate_event_resource(resource_t* resource);
-  
+Seulement dans emma-node/apps/: emma-node
+diff -ur src/emma-node/dep/apps/erbium/erbium.c emma-node/apps/erbium/erbium.c
+--- src/emma-node/dep/apps/erbium/erbium.c	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/erbium/erbium.c	2013-10-17 14:26:55.059721140 +0200
+@@ -76,7 +76,7 @@
+ void
+ rest_activate_resource(resource_t* resource)
+ {
+-  PRINTF("Activating: %s", resource->url);
++  PRINTF("Activating: %s\n", resource->url);
+ 
+   if (!resource->pre_handler)
+   {
+@@ -90,6 +90,13 @@
+   list_add(restful_services, resource);
+ }
+ 
++void rest_disable_resource(resource_t* resource)
++{
++	PRINTF("Disabling: %s\n", resource->url);
++	
++	list_remove(restful_services, resource);
++}
++
+ void
+ rest_activate_periodic_resource(periodic_resource_t* periodic_resource)
+ {
+@@ -148,22 +155,44 @@
+ {
+   uint8_t found = 0;
+   uint8_t allowed = 0;
++  
++  int resourceUrlLen = 0;
++  int requestUrlLen = 0;
+ 
+-  PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
++  //PRINTF("rest_invoke_restful_service url /%.*s -->\n", url_len, url);
+ 
+   resource_t* resource = NULL;
++  resource_t* defaultResource = NULL;
+   const char *url = NULL;
+ 
++	requestUrlLen = REST.get_url(request, &url);
++	PRINTF("[ERBIUM] Handling request on resource: '");
++	for(resourceUrlLen=0 ; resourceUrlLen<requestUrlLen ; resourceUrlLen++) PRINTF("%c-", url[resourceUrlLen]);
++	PRINTF("'.\n");
++	//PRINTF("[ERBIUM] toto.\n");
++	// Looking for resource associated with the exact request URL
++	
++	rest_resource_flags_t method = REST.get_method_type(request);
++	
+   for (resource = (resource_t*)list_head(restful_services); resource; resource = resource->next)
+   {
++    resourceUrlLen = strlen(resource->url);
++    if (resourceUrlLen == 0) defaultResource = resource;
++    
++    
+     /*if the web service handles that kind of requests and urls matches*/
+-    if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES)))
+-        && strncmp(resource->url, url, strlen(resource->url)) == 0)
++    //if ((REST.get_url(request, &url)==strlen(resource->url) || (REST.get_url(request, &url)>strlen(resource->url) && (resource->flags & HAS_SUB_RESOURCES))) && strncmp(resource->url, url, strlen(resource->url)) == 0)
++    //if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If resource exists
++    
++    if (((requestUrlLen == resourceUrlLen) || ((requestUrlLen > resourceUrlLen) && (resource->flags & HAS_SUB_RESOURCES))) && (strncmp(resource->url, url, requestUrlLen) == 0)) // swap in strcmp
++    
++    //if ((requestUrlLen == resourceUrlLen) && (strncmp(resource->url, url, resourceUrlLen) == 0)) // If exact resource exists
+     {
+       found = 1;
+-      rest_resource_flags_t method = REST.get_method_type(request);
+ 
+-      PRINTF("method %u, resource->flags %u\n", (uint16_t)method, resource->flags);
++      PRINTF("method %u, resource->flags %02X\n", (uint16_t)method, resource->flags);
++      //if (resource->flags & HAS_SUB_RESOURCES) PRINTF("[ERBIUM] HAS SUB-RESOURCES\n");
++			//else PRINTF("[ERBIUM] FLAGS: %02X\n", resource->flags);
+ 
+       if (resource->flags & method)
+       {
+@@ -186,11 +215,35 @@
+       }
+       break;
+     }
+-  }
++  }  
++	
++	if (!found && defaultResource)
++	{
++		if (defaultResource->flags & method)
++    {
++      found = 1;
++      allowed = 1;
+ 
+-  if (!found) {
+-    REST.set_response_status(response, REST.status.NOT_FOUND);
+-  }
++      /*call pre handler if it exists*/
++      if (!defaultResource->pre_handler || defaultResource->pre_handler(defaultResource, request, response))
++      {
++        /* call handler function*/
++        defaultResource->handler(request, response, buffer, buffer_size, offset);
++
++        /*call post handler if it exists*/
++        if (defaultResource->post_handler)
++        {
++          defaultResource->post_handler(defaultResource, request, response);
++        }
++      }
++    } else {
++      REST.set_response_status(response, REST.status.METHOD_NOT_ALLOWED);
++    }
++	}
++	else if (!found)
++	{
++		REST.set_response_status(response, REST.status.NOT_FOUND);
++	}
+ 
+   return found & allowed;
+ }
+diff -ur src/emma-node/dep/apps/erbium/erbium.h emma-node/apps/erbium/erbium.h
+--- src/emma-node/dep/apps/erbium/erbium.h	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/erbium/erbium.h	2013-10-17 14:26:55.059721140 +0200
+@@ -294,6 +294,7 @@
+  * Resources wanted to be accessible should be activated with the following code.
+  */
+ void rest_activate_resource(resource_t* resource);
++void rest_disable_resource(resource_t* resource);
+ void rest_activate_periodic_resource(periodic_resource_t* periodic_resource);
+ void rest_activate_event_resource(resource_t* resource);
+ 
+diff -ur src/emma-node/dep/apps/er-coap-07/er-coap-07.c emma-node/apps/er-coap-07/er-coap-07.c
+--- src/emma-node/dep/apps/er-coap-07/er-coap-07.c	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/er-coap-07/er-coap-07.c	2014-01-14 14:31:01.873121646 +0100
+@@ -282,6 +282,21 @@
+ {
+   return ++current_mid;
+ }
++
++/*-----------------------------------------------------------------------------------*/
++void
++coap_set_current_mid(uint16_t mid)
++{
++  printf("Setting new MID %d\n", mid);
++  current_mid = mid;
++}
++
++uint16_t coap_get_current_mid()
++{
++  return current_mid;
++}
++
++
+ /*-----------------------------------------------------------------------------------*/
+ /*- MEASSAGE PROCESSING -------------------------------------------------------------*/
+ /*-----------------------------------------------------------------------------------*/
+diff -ur src/emma-node/dep/apps/er-coap-07/er-coap-07-engine.c emma-node/apps/er-coap-07/er-coap-07-engine.c
+--- src/emma-node/dep/apps/er-coap-07/er-coap-07-engine.c	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/er-coap-07/er-coap-07-engine.c	2014-01-17 16:01:03.784844730 +0100
+@@ -44,7 +44,7 @@
+ 
+ #include "er-coap-07-engine.h"
+ 
+-#define DEBUG 0 
++#define DEBUG 0
+ #if DEBUG
+ #define PRINTF(...) printf(__VA_ARGS__)
+ #define PRINT6ADDR(addr) PRINTF("[%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x]", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7], ((uint8_t *)addr)[8], ((uint8_t *)addr)[9], ((uint8_t *)addr)[10], ((uint8_t *)addr)[11], ((uint8_t *)addr)[12], ((uint8_t *)addr)[13], ((uint8_t *)addr)[14], ((uint8_t *)addr)[15])
+@@ -148,7 +148,7 @@
+           if (service_cbk)
+           {
+             /* Call REST framework and check if found and allowed. */
+-            if (service_cbk(message, response, transaction->packet+COAP_MAX_HEADER_SIZE, block_size, &new_offset))
++            if (service_cbk(message, response, transaction->packet+COAP_MAX_HEADER_SIZE, block_size, &new_offset) != -1)
+             {
+               if (coap_error_code==NO_ERROR)
+               {
+@@ -197,6 +197,14 @@
+               } /* no errors/hooks */
+             } /* successful service callback */
+ 
++            // If user application don't want answer, just drop transaction
++            if(response->mid == -1) {
++              PRINTF("Cancel transaction by user application\n");
++              coap_transaction_t* t = coap_get_transaction_by_mid(message->mid);
++              coap_clear_transaction(t);
++              return NO_ERROR;
++              }
++
+             /* Serialize response. */
+             if (coap_error_code==NO_ERROR)
+             {
+diff -ur src/emma-node/dep/apps/er-coap-07/er-coap-07.h emma-node/apps/er-coap-07/er-coap-07.h
+--- src/emma-node/dep/apps/er-coap-07/er-coap-07.h	2013-10-17 14:26:11.595721844 +0200
++++ emma-node/apps/er-coap-07/er-coap-07.h	2014-01-14 11:52:55.521274978 +0100
+@@ -248,10 +248,15 @@
+ } coap_packet_t;
+ 
+ 
++
+ /* To store error code and human-readable payload */
+ extern coap_status_t coap_error_code;
+ extern char *coap_error_message;
+ 
++void coap_set_current_mid(uint16_t mid);
++
++uint16_t coap_get_current_mid();
++
+ void coap_init_connection(uint16_t port);
+ uint16_t coap_get_mid(void);
+ 

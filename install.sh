@@ -25,11 +25,12 @@ echo -e ""
 echo -e  "Contiki patching"
 echo -e  "================"
 patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-raven.diff
-patch -p2 --directory=$DEST --input=$THIS/patch/patch_erbium.diff
+echo -e "STARTED"
+patch -p1 --directory=$DEST --input=$THIS/patch/patch_erbium.diff
+echo -e "ENDED"
 patch -p2 --directory=$DEST --input=$THIS/patch/raven-main_patch.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/border-router_patch.diff
 patch -p2 --directory=$DEST --input=$THIS/patch/patch-slip-activate-control-overrun.diff
-patch -p2 --directory=$DEST --input=$THIS/patch/patch_erbium.diff
 
 # Temporary CFS patch
 patch -p2 --directory=$DEST --input=$THIS/patch/cfs_patch.diff
