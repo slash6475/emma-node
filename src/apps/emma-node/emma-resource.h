@@ -65,14 +65,14 @@ typedef struct EmmaResourceName {
 
 
 typedef void* (* emma_resource_allocator)();
-typedef void (* emma_resource_cleaner)(void* data);
-typedef int (* emma_resource_opener)(void* data);
-typedef int (* emma_resource_writer) (void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index);
-typedef int (* emma_resource_reader) (void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index);
-typedef int (* emma_resource_closer)(void* data);
-typedef void (* emma_resource_setter) (void* data);
+typedef void (* emma_resource_cleaner)(char* uri, void* data);
+typedef int (* emma_resource_opener)(char* uri, void* data);
+typedef int (* emma_resource_writer) (char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index);
+typedef int (* emma_resource_reader) (char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index);
+typedef int (* emma_resource_closer)(char* uri, void* data);
+typedef void (* emma_resource_setter) (char* uri, void* data);
 typedef void (* emma_resource_root_init) ();
-typedef uint8_t (* emma_resource_regex) (void* user_data, char* pattern, emma_index_t* start, emma_index_t* stop);
+typedef uint8_t (* emma_resource_regex) (char* uri, void* user_data, char* pattern, emma_index_t* start, emma_index_t* stop);
 
 #define EMMA_MUTEX_LOCKED	1
 #define EMMA_MUTEX_RELEASED	0

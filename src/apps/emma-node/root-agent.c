@@ -112,9 +112,9 @@ static void* root_agent_alloc()
 	}
 	return agent;
 }
-void root_agent_free(void* data) {ROOT_FREE(data);memory[((root_agent_t*)data)->memoryIndex]=0;}
+void root_agent_free(char* uri, void* data) {ROOT_FREE(data);memory[((root_agent_t*)data)->memoryIndex]=0;}
 
-void root_agent_reset(void* data)
+void root_agent_reset(char* uri, void* data)
 {
 	// Never set or reset memoryIndex !!! (already managed in alloc / free)
 	memset(((root_agent_t*)data)->patternIndex, 0, MAX_PATTERNS);
@@ -123,7 +123,7 @@ void root_agent_reset(void* data)
 	JSONnParse_clean(&(((root_agent_t*)data)->parser));
 }
 
-static uint8_t root_agent_analyze_block(root_agent_t* agent, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+static uint8_t root_agent_analyze_block(char* uri, root_agent_t* agent, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	int cnt;
 	uint8_t patternCnt;
@@ -134,7 +134,7 @@ static uint8_t root_agent_analyze_block(root_agent_t* agent, uint8_t* data_block
 	// Init the agent if first block
 	if (block_index == 0)
 	{
-		root_agent_reset(agent);
+		root_agent_reset(uri, agent);
 		JSONnParse_clean(&(agent->parser));
 	}
 	
@@ -177,7 +177,7 @@ static uint8_t root_agent_analyze_block(root_agent_t* agent, uint8_t* data_block
 	return 0;
 }
 
-int root_agent_write(void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+int root_agent_write(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	// Variables
 	root_agent_t* agent = (root_agent_t*)user_data;
@@ -188,7 +188,7 @@ int root_agent_write(void* user_data, uint8_t* data_block, emma_size_t block_siz
 	//if (block_index < agent->size) return 0; // Do not write multiple times the same block !!
 	
 	// Verify block
-	if (root_agent_analyze_block(agent, data_block, block_size, block_index) != 0)
+	if (root_agent_analyze_block(uri, agent, data_block, block_size, block_index) != 0)
 	{
 		PRINT("[WRITE] Invalid block at index #%d\n", block_index);
 		return 0;
@@ -235,7 +235,7 @@ int root_agent_write(void* user_data, uint8_t* data_block, emma_size_t block_siz
 	return nbBytesWritten;
 }
 
-int root_agent_read(void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+int root_agent_read(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	root_agent_t* agent = (root_agent_t*)user_data;
 	int nbBytesRead = 0;
@@ -279,7 +279,7 @@ int root_agent_read(void* user_data, uint8_t* data_block, emma_size_t block_size
 	return nbBytesRead;
 }
 
-uint8_t root_agent_regex(void* user_data, char* pattern, emma_index_t* start, emma_index_t* stop)
+uint8_t root_agent_regex(char* uri, void* user_data, char* pattern, emma_index_t* start, emma_index_t* stop)
 {
 	//PRINT("[REGEX] Not implemented\n");
 	// Compute stopIndex, startIndex is already saved in agent structure

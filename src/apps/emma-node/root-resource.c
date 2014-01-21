@@ -106,14 +106,14 @@ void root_resource_init()
 	set_reference_solver(&root_resource_stack, root_resource_solver);
 }
 static void* root_resource_alloc() {return ROOT_ALLOC(0);}
-void root_resource_free(void* data) {ROOT_FREE(data);}
+void root_resource_free(char* uri, void* data) {ROOT_FREE(data);}
 
-void root_resource_reset(void* data)
+void root_resource_reset(char* uri, void* data)
 {
 	((root_resource_t*)data)->value = 0;
 }
 
-int root_resource_open(void* data)
+int root_resource_open(char* uri, void* data)
 {
 	//PRINT("open not implemented\n");
 	// TODO: Implement Post-fixed evaluator, each resource should maintain a stack to avoid
@@ -124,7 +124,7 @@ int root_resource_open(void* data)
 	return 1;
 }
 
-int root_resource_write(void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+int root_resource_write(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	eval_status_t err = EVAL_COMPLETE;
 	
@@ -155,7 +155,7 @@ int root_resource_write(void* user_data, uint8_t* data_block, emma_size_t block_
 	return 0;*/
 }
 
-int root_resource_read(void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
+int root_resource_read(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	if ((user_data==NULL) || (data_block==NULL)) return 0;
 	root_resource_t* res = (root_resource_t*)user_data;
@@ -165,7 +165,7 @@ int root_resource_read(void* user_data, uint8_t* data_block, emma_size_t block_s
 	return intoa(res->value, data_block, block_size, block_index);
 }
 
-int root_resource_close(void* data)
+int root_resource_close(char* uri, void* data)
 {
 	//PRINT("close not implemented\n");
 	/* TODO */

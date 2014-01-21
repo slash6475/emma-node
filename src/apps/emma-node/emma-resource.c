@@ -510,7 +510,7 @@ uint8_t emma_resource_add (emma_resource_root_id_t root, char* name)
 		{
 			//PRINT("[ADD] Allocated=&%d\n", resource->data);
 			strncpy(resource->name, emma_get_resource_basename(name), EMMA_RESOURCE_NAME_SIZE);
-			if ((resources_roots[root])->reset) (resources_roots[root])->reset(resource->data);
+			if ((resources_roots[root])->reset) (resources_roots[root])->reset(name, resource->data);
 		}
 		else
 		{
@@ -577,7 +577,7 @@ uint8_t emma_resource_del (char* uri)
 		if (resource->subRoot != NULL) return 3; // Unable to delete non-empty folder
 		
 		// Free user data
-		if ((resources_roots[root])->free) (resources_roots[root])->free(resource->data);
+		if ((resources_roots[root])->free) (resources_roots[root])->free(uri, resource->data);
 		else return 4; // Unable to delete resource
 		
 		// Extract resource from list or subRoot
@@ -630,7 +630,7 @@ int emma_resource_read (char* uri, uint8_t* data_block, emma_size_t block_size, 
 	if (resource)
 	{
 		PRINT("[READ] '%s'\n", resource->name);
-		if ((resources_roots[root])->read) return (resources_roots[root])->read(resource->data, data_block, block_size, block_index);
+		if ((resources_roots[root])->read) return (resources_roots[root])->read(uri, resource->data, data_block, block_size, block_index);
 		else return 0;
 	}
 	else return 0;
@@ -650,7 +650,7 @@ int emma_resource_write (char* uri, uint8_t* data_block, emma_size_t block_size,
 	if (resource)
 	{
 		PRINT("[WRITING] '%s'\n", resource->name);
-		if ((resources_roots[root])->write) return (resources_roots[root])->write(resource->data, data_block, block_size, block_index);
+		if ((resources_roots[root])->write) return (resources_roots[root])->write(uri, resource->data, data_block, block_size, block_index);
 		else return 0;
 	}
 	else return 0;
@@ -766,7 +766,7 @@ uint8_t emma_resource_get_index_of_pattern(char* uri, char* pattern, emma_index_
 	
 	if (resource)
 	{
-		if ((resources_roots[root])->match) return (resources_roots[root])->match(resource->data, pattern, start, stop);
+		if ((resources_roots[root])->match) return (resources_roots[root])->match(uri, resource->data, pattern, start, stop);
 		else return 0;
 	}
 	else return 0;
@@ -793,7 +793,7 @@ int emma_resource_open(char* uri)
 	if (resource)
 	{
 		PRINT("[OPEN] '%s'\n", resource->name);
-		if ((resources_roots[root])->open) return (resources_roots[root])->open(resource->data);
+		if ((resources_roots[root])->open) return (resources_roots[root])->open(uri, resource->data);
 		return 1;
 	}
 	
@@ -814,7 +814,7 @@ int emma_resource_close(char* uri)
 	if (resource)
 	{
 		PRINT("[OPEN] '%s'\n", resource->name);
-		if ((resources_roots[root])->close) return (resources_roots[root])->close(resource->data);
+		if ((resources_roots[root])->close) return (resources_roots[root])->close(uri, resource->data);
 		else return 1;
 	}
 	else return 0;
