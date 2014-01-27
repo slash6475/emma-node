@@ -26,7 +26,7 @@
 
 #include <string.h>
 
-#define LDEBUG 0
+#define LDEBUG 1
 #if (LDEBUG | GDEBUG | SERVER_DEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[EMMA SERVER] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)
@@ -87,6 +87,7 @@ PROCESS_THREAD(emma_server_process, ev, data)
     if(ev == PROCESS_EVENT_TIMER){
     	done = 0;
     	do {
+
     		for(i=0; i < get_resources_number(); i++){
 	    		done = get_next_resource_name_by_root(i, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 	    		resource[done] = '\0';

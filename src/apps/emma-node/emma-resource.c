@@ -22,12 +22,12 @@
 // Include all roots files here
 #include "root-agent.h"
 #include "root-resource.h"
-//#include "root-local.h"
+#include "root-system.h"
 
 static emma_resource_root_t* resources_roots[] = {
 	EMMA_RESOURCE_ROOT(root_agent),
 	EMMA_RESOURCE_ROOT(root_resource),
-	//EMMA_RESOURCE_ROOT(root_local),
+	EMMA_RESOURCE_ROOT(root_system)
 };
 
 

@@ -68,9 +68,10 @@
 #define	EMMA_NOBODY_ID		0		// Nobody process ID
 #define EMMA_SERVER_ID		1		// Process ID used to specify the resource modifier
 #define EMMA_CLIENT_ID		2		// Process ID used to specify the resource modifier
+#define EMMA_SYSTEM_ID      3       // Process ID used to specify the resource modifier
 
-#define EMMA_SERVER_TIMEOUT_SECOND 		20
-#define EMMA_CLIENT_POLLING_INTERVAL	5
+#define EMMA_SERVER_TIMEOUT_SECOND 		30
+#define EMMA_CLIENT_POLLING_INTERVAL	30
 
 /* Tests on configuration (do not modify) */
 #if GDEBUG | CLIENT_DEBUG | SERVER_DEBUG | RESOURCE_DEBUG

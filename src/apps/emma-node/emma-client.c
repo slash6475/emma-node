@@ -176,15 +176,18 @@ PROCESS_THREAD(emma_client_process, ev, data)
 							{
 								// Resource already locked by another process
 								state = EMMA_CLIENT_WAITING_MUTEX;
+								printf("Already locked %s\n", (char*)resource);
 							}
 						}
-						else
+						else 
 						{
+							// If a resource cannot be locked, some process is working, we let him to finish
+							nbBytesRead = 0;
 							emma_resource_set_last_modified(resource, EMMA_CLIENT_ID);
-							PRINT("%s locked\n", (char*)resource);
 						}
 					}
-					nbBytesRead = get_next_resource_name_by_root(0, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
+					if(nbBytesRead)
+						nbBytesRead = get_next_resource_name_by_root(0, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 				}
 			
 				if (state != EMMA_CLIENT_WAITING_MUTEX) PRINT("[MAIN] All resources locked\n");
@@ -337,16 +340,15 @@ PROCESS_THREAD(emma_client_process, ev, data)
 									{
 										PRINT("Local address\n");
 										previousFail = 0;
-										// Send block in a local way ...
-										if (TARGETmethod == CLIENT_DELETE) {
-											emma_resource_del(TARGETuri);
-										}
-										else if (strncmp(TARGETuri, resource, strlen(TARGETuri)) != 0)
-										{
-											
-											//if (TARGETmethod != CLIENT_DELETE)
-											//else
-											//{
+
+										if(!emma_resource_exists(TARGETuri) && TARGETmethod == CLIENT_POST){
+
+											// Send block in a local way ...
+											if (TARGETmethod == CLIENT_DELETE) {
+												emma_resource_del(TARGETuri);
+											}
+											else if (strncmp(TARGETuri, resource, strlen(TARGETuri)) != 0)
+											{
 												// PUT block on local resource
 												if (POSTblockNum == 0)
 												{
@@ -380,11 +382,17 @@ PROCESS_THREAD(emma_client_process, ev, data)
 													}
 												}
 											//}
+											}
+											else
+											{
+												PRINT("Agent cannot modify itself\n");
+												previousFail = 0; // Avoid looping on agents that change themselves
+											}
+
 										}
 										else
 										{
-											PRINT("Agent cannot modify itself\n");
-											previousFail = 0; // Avoid looping on agents that change themselves
+											PRINT("Resource is already existing\n");
 										}
 									}
 									else
@@ -424,34 +432,7 @@ PROCESS_THREAD(emma_client_process, ev, data)
 							{
 								PRINT("No POST start character found.\n");
 							}
-						
-							/* Print POST
-							while(POSTindex == EMMA_CLIENT_BUFFER_SIZE)
-							{
-								for(cnt=0 ; cnt<POSTindex ; cnt++) PRINTS("%c", buffer[cnt]);
-								// Send chunk
-								coap_set_header_block1(request, POSTblockcnt, 1, EMMA_CLIENT_BUFFER_SIZE);
-								coap_set_payload(request, buffer, POSTindex);
-								sendOK = 0;
-								if (pre) COAP_BLOCKING_REQUEST(&TARGETadd, TARGETport, request, emma_client_chunk_callback);
-								if (!sendOK && pre) PRINT("Error POSTING chunk\n");
-								POSTblockcnt++;
-								POSTindex = getNextPOST(NULL, buffer, EMMA_CLIENT_BUFFER_SIZE, &POSTtype);
-							}
-							for(cnt=0 ; cnt<POSTindex ; cnt++) PRINTS("%c", buffer[cnt]);
-							PRINTS("'\n");
-						
-							// Send Last chunk
-							coap_set_header_block1(request, POSTblockcnt, 0, EMMA_CLIENT_BUFFER_SIZE);
-							coap_set_payload(request, buffer, POSTindex);
-							sendOK = 0;
-							if (pre) COAP_BLOCKING_REQUEST(&TARGETadd, TARGETport, request, emma_client_chunk_callback);
-							if (!sendOK && pre) PRINT("Error POSTING chunk\n");
-							//POSTindex = getNextPOST(NULL, buffer, EMMA_CLIENT_BUFFER_SIZE, &POSTtype);
-							//*/
-						
-						
-						
+
 							TARGETmethod = 0;
 							if (! previousFail) code = getNextTARGET(NULL, &TARGETmethod, &TARGETadd, &TARGETport, TARGETuri);
 							else code = 0;
@@ -464,7 +445,7 @@ PROCESS_THREAD(emma_client_process, ev, data)
 					if (! previousFail) nbBytesRead = get_next_resource_name_by_root(0, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 					else nbBytesRead = 0;
 					
-					nbBytesRead = 0;
+					//nbBytesRead = 0;
 				} // while(nbBytesRead && ...)
 			
 				/* ************************************* */
