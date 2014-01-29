@@ -63,8 +63,8 @@
 //#include <stdint.h>
 
 /* EMMA Constants */
-#define EMMA_MAX_RESOURCES 18 //(3*5 + 3roots)
-#define EMMA_MAX_URI_SIZE  32 // (4*8 <=> depth of 4)
+#define EMMA_MAX_RESOURCES 18 		//(3*5 + 3roots)
+#define EMMA_MAX_URI_SIZE  32 		// (4*8 <=> depth of 4)
 #define	EMMA_NOBODY_ID		0		// Nobody process ID
 #define EMMA_SERVER_ID		1		// Process ID used to specify the resource modifier
 #define EMMA_CLIENT_ID		2		// Process ID used to specify the resource modifier

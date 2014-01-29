@@ -341,7 +341,7 @@ PROCESS_THREAD(emma_client_process, ev, data)
 										PRINT("Local address\n");
 										previousFail = 0;
 
-										if(!emma_resource_exists(TARGETuri) && TARGETmethod == CLIENT_POST){
+										if( !(emma_resource_exists(TARGETuri) && TARGETmethod == CLIENT_POST && POSTblockNum == 0)){
 
 											// Send block in a local way ...
 											if (TARGETmethod == CLIENT_DELETE) {
@@ -592,7 +592,7 @@ uint8_t getNextTARGET(char* resource, uint8_t* method, uip_ipaddr_t* address, ui
 		startIndex = 0;
 		stopIndex = 0;
 		if (!emma_resource_get_index_of_pattern(agent, "$TARGET", &startIndex, &stopIndex)) return 0;
-		startIndex++;
+		startIndex++; // drop [ of list
 		found = 0;
 		uriIndex = 0;
 		methodSet = 0;
@@ -633,6 +633,8 @@ uint8_t getNextTARGET(char* resource, uint8_t* method, uip_ipaddr_t* address, ui
 			{
 				//PRINT("[getNextTARGET] Watching: %c\n", block[cnt]);
 				if (block[cnt]=='[') methodSet = 1;
+					
+				// Extract method name
 				else
 				{
 					for (index=0 ; index<4 ; index++)

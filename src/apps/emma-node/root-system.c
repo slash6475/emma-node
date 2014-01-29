@@ -121,9 +121,20 @@ ipaddr_add(char* buff, const uip_ipaddr_t *addr)
   }
 }
 
-static void* root_system_alloc() {return ROOT_ALLOC(0);}
-void root_system_free(char* uri, void* data) {ROOT_FREE(data);}
-void root_system_reset(void* data) {}
+static void* root_system_alloc() 
+{
+	return ROOT_ALLOC(0);
+}
+
+void root_system_free(char* uri, void* data) 
+{
+	ROOT_FREE(data);
+}
+
+void root_system_reset(void* data) 
+{
+	
+}
 
 int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
@@ -160,26 +171,39 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 				buff[0] = '\0';
 				ipaddr_add(buff, &uip_ds6_nbr_cache[i].ipaddr);
 
-				// On a assez de place
+				/*
+				   Compute remaided space in packet payload with the current content and the adress ip in buff with the 2 separators
+				*/
 				offset = block_size - strlen(data_block) - strlen(buff) - 2;
 				snprintf(data_block, block_size, "%s%c\"%s%c", data_block, (!first?',':' '), buff ,(offset>0 ? '"':' '));
+
+				/*
+				   We start writing at the \0 added by snprintf if we can add other contain
+				*/
 				if(offset>0) offset --;
 
-				// Si on a atteint le paquet a généré et qu'il est plein, on le transmet
+				/* 
+				   If the current address has been splited because payload is full, we send the packet
+				*/
 				if(offset <= 0 && Count == block_index/block_size) 
 					return block_size;
 
-				// Si on a pas atteint le paquet a généré, 
-				// on nettoie et ajoute la fin non envoyé de l'adresse en cours au paquet suivant
+				/* 
+				   If this is the address which has been splited at the previous packet sending,
+				   We add it at the begining of the packet before adding the next address
+				*/
 				else if(offset <= 0 && Count < block_index/block_size){
 					snprintf(data_block, block_size, "%s\"", buff+(strlen(buff) + offset - 1));
 					Count ++;
 				}
+
 				if(first) first = 0;
 			}
 		}
 	}
-	
+	/*
+	No more packet to send, we end JSON table and send it
+	*/
 	snprintf(data_block, block_size, "%s]",data_block);
 	return strlen(data_block)+1;
 }
