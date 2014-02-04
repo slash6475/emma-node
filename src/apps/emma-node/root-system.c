@@ -150,7 +150,7 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	char buff[block_size];
 
 	char* resource = emma_get_resource_name(uri);
-printf("BEGIN\n");
+
 	if(strncmp(resource, "time\0", 4) == 0)
 	{
 		return snprintf(data_block, block_size, "%d", clock_seconds());
@@ -242,22 +242,19 @@ printf("BEGIN\n");
 		   If this is the address which has been splited at the previous packet sending,
 		   We add it at the begining of the packet before adding the next address (offset is neative)
 		*/
-		else if(offset <= 0 && Count < block_index/block_size){
-			printf("%d %d\n",offset, block_index );
-			
+		else if(offset <= 0 && Count < block_index/block_size){		
+			/*
+				If previous iteration wasn't add all previous resource,
+				we generate the buffer and send the end
+			*/
 			snprintf(data_block, block_size, ",\"%s\"", buff);
 			snprintf(buff, block_size, "%s", data_block);
+
 			/*
-				If previous iteration wasn't add ," we add it
+			We fill with buffer end not already sent
 			*/
-/*			if(offset + strlen(buff) + 1 == 0 && strlen(buff) > 0){
-				snprintf(data_block, block_size, ",\"%s", buff);
-			    snprintf(buff, block_size, "%s", data_block);
-			}
-*/
 			snprintf(data_block, block_size, "%s", buff+(strlen(buff) + offset -2));
 			Count ++;
-			printf("Count %d : %s\n", Count, data_block);
 		}
 		if(first) first = 0;
 
