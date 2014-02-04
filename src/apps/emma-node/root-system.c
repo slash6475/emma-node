@@ -40,7 +40,7 @@ typedef struct rootAgent {
 	int value;
 } root_system_t;
 
-#define ROOT_SYSTEM_MAX_ALLOC 4
+#define ROOT_SYSTEM_MAX_ALLOC 5
 MEMB(root_system_R, root_system_t, ROOT_SYSTEM_MAX_ALLOC);
 #define ROOT_MEM_INIT() memb_init(&root_system_R)
 #define ROOT_FREE(r) memb_free(&root_system_R, r)
@@ -61,6 +61,7 @@ void root_system_init() {
 	emma_resource_add(emma_get_resource_root("S/rand"), 	emma_get_resource_name("S/rand"));
 	emma_resource_add(emma_get_resource_root("S/time"), 	emma_get_resource_name("S/time"));
 	emma_resource_add(emma_get_resource_root("S/neighbor"), emma_get_resource_name("S/neighbor"));
+	emma_resource_add(emma_get_resource_root("S/resources"), emma_get_resource_name("S/resources"));
 
 	process_start(&emma_system_process, NULL);
 }
@@ -102,21 +103,26 @@ PROCESS_THREAD(emma_system_process, ev, data)
 *
 *************************************************************************************/
 void
-ipaddr_add(char* buff, const uip_ipaddr_t *addr)
+ipaddr_add(char* buff, const uip_ipaddr_t *addr, emma_size_t block_size)
 {
   uint16_t a;
   int8_t i, f;
   for(i = 0, f = 0; i < sizeof(uip_ipaddr_t); i += 2) {
     a = (addr->u8[i] << 8) + addr->u8[i + 1];
     if(a == 0 && f >= 0) {
-      if(f++ == 0) sprintf(buff, "%s::", buff);
+      if(f++ == 0) {
+      	snprintf(buff, block_size, "%s::", buff);
+      	if(strlen(buff) + 1 == block_size) return;
+  		}
     } else {
       if(f > 0) {
         f = -1;
       } else if(i > 0) {
-        sprintf(buff, "%s:", buff);
+        snprintf(buff, block_size, "%s:", buff);
+      	if(strlen(buff) + 1 == block_size) return;
       }
-      sprintf(buff, "%s%x",buff, a);
+      snprintf(buff, block_size, "%s%x",buff, a);
+      	if(strlen(buff) + 1 == block_size) return;
     }
   }
 }
@@ -141,10 +147,10 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	uint16_t a;
 	int8_t i, j, k, f, first=1;
 	int nbBytesRead = 0, Count=0, offset = 0;
-	char buff[128];
+	char buff[block_size];
 
 	char* resource = emma_get_resource_name(uri);
-
+printf("BEGIN\n");
 	if(strncmp(resource, "time\0", 4) == 0)
 	{
 		return snprintf(data_block, block_size, "%d", clock_seconds());
@@ -167,9 +173,8 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 		{
 			if(uip_ds6_nbr_cache[i].isused) 
 			{
-
 				buff[0] = '\0';
-				ipaddr_add(buff, &uip_ds6_nbr_cache[i].ipaddr);
+				ipaddr_add(buff, &uip_ds6_nbr_cache[i].ipaddr, block_size);
 
 				/*
 				   Compute remaided space in packet payload with the current content and the adress ip in buff with the 2 separators
@@ -185,14 +190,14 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 				/* 
 				   If the current address has been splited because payload is full, we send the packet
 				*/
-				if(offset <= 0 && Count == block_index/block_size) 
-					return block_size;
+				if(offset <= 0 && Count == block_index / block_size) 
+					return strlen(data_block)+1;
 
 				/* 
 				   If this is the address which has been splited at the previous packet sending,
 				   We add it at the begining of the packet before adding the next address
 				*/
-				else if(offset <= 0 && Count < block_index/block_size){
+				else if(offset <= 0 && Count < block_index / block_size){
 					snprintf(data_block, block_size, "%s\"", buff+(strlen(buff) + offset - 1));
 					Count ++;
 				}
@@ -200,12 +205,72 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 				if(first) first = 0;
 			}
 		}
-	}
 	/*
 	No more packet to send, we end JSON table and send it
 	*/
 	snprintf(data_block, block_size, "%s]",data_block);
 	return strlen(data_block)+1;
+	}
+
+	else if(strncmp(resource, "resources\0", 8) == 0)
+	{
+	Count = 0;
+	snprintf(data_block, block_size, "[");
+
+	get_next_resource_name_by_root_reset();
+	nbBytesRead = get_next_resource_name_by_root(0, buff, block_size);
+	do
+	{
+		for(j=nbBytesRead; j < block_size; j++)	buff[j] = '\0';
+		/*
+		   Compute remaided space in packet payload with the current content and the adress ip in buff with the 2 separators
+		*/
+		offset = block_size - strlen(data_block) - strlen(buff) - 2;
+		snprintf(data_block, block_size, "%s%c\"%s%c", data_block, (!first?',':' '), buff ,(offset>0 ? '"':' '));
+
+		/*
+		   We start writing at the \0 added by snprintf if we can add other contain
+		*/
+		if(offset>0) offset --;
+		/* 
+		   If the current address has been splited because payload is full, we send the packet
+		*/
+		if(strlen(data_block) == block_size - 1 && Count == block_index/block_size) 
+			return strlen(data_block)+1;
+		
+		/* 
+		   If this is the address which has been splited at the previous packet sending,
+		   We add it at the begining of the packet before adding the next address (offset is neative)
+		*/
+		else if(offset <= 0 && Count < block_index/block_size){
+			printf("%d %d\n",offset, block_index );
+			
+			snprintf(data_block, block_size, ",\"%s\"", buff);
+			snprintf(buff, block_size, "%s", data_block);
+			/*
+				If previous iteration wasn't add ," we add it
+			*/
+/*			if(offset + strlen(buff) + 1 == 0 && strlen(buff) > 0){
+				snprintf(data_block, block_size, ",\"%s", buff);
+			    snprintf(buff, block_size, "%s", data_block);
+			}
+*/
+			snprintf(data_block, block_size, "%s", buff+(strlen(buff) + offset -2));
+			Count ++;
+			printf("Count %d : %s\n", Count, data_block);
+		}
+		if(first) first = 0;
+
+		nbBytesRead = get_next_resource_name_by_root(0, buff, block_size);
+	}
+	while(nbBytesRead);
+	/*
+	No more packet to send, we end JSON table and send it
+	*/
+	snprintf(data_block, block_size, "%s]",data_block);
+	return strlen(data_block)+1;
+	}
+	return 0;
 }
 
 emma_resource_root_t root_system = {

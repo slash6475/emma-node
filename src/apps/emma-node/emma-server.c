@@ -87,14 +87,13 @@ PROCESS_THREAD(emma_server_process, ev, data)
     if(ev == PROCESS_EVENT_TIMER){
     	done = 0;
     	do {
-
     		for(i=0; i < get_resources_number(); i++){
 	    		done = get_next_resource_name_by_root(i, (uint8_t*)resource, EMMA_MAX_URI_SIZE);
 	    		resource[done] = '\0';
 
 	      		if(emma_resource_is_locked(resource) && 
 	      			clock_seconds() - emma_resource_get_clocktime (resource) > EMMA_SERVER_TIMEOUT_SECOND &&
-	      			emma_client_state() == EMMA_CLIENT_IDLE)
+	      			(emma_client_state() == EMMA_CLIENT_IDLE || emma_client_state() == EMMA_CLIENT_WAITING_MUTEX))
 	      		{
 
 	      			PRINT("Timeout - Forced unlocking of resource %s\n", resource);
@@ -165,11 +164,12 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 	char* pUri = NULL;
 	int uriSize = 0;
 	char uri[EMMA_MAX_URI_SIZE+1];
+	char buff[EMMA_MAX_URI_SIZE+1];
 	rest_resource_flags_t rq_flag;
 	emma_size_t nbBytes = 0;
 	uint8_t emmaCode = 0;
 
-	uint8_t i = 0;
+	uint8_t i = 0, j,k;
 	static unsigned long long  count;
 
 	// For PUT method only
@@ -198,7 +198,49 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 		*/
 		if (rq_flag & METHOD_GET)
 		{
-			if (emma_resource_lock(uri))
+			/*
+			* Request for the list of a particular root
+			*/
+			if (emma_resource_is_root(uri)){
+				PRINT("[HANDLER] GET root '%s' ; preferred_size=%d ; offset=%d\n", uri, preferred_size, *offset);
+				buffer[0] = '[';
+				buffer[1] = '\0';
+				dCnt = 0;
+
+				nbBytes = get_next_resource_name_by_root(emma_get_resource_root(uri), buff, preferred_size);
+				do {
+					buff[nbBytes] = '\0';
+					/*
+					* Add only resource of the selected root
+					*/
+					if(emma_get_resource_root(uri) == emma_get_resource_root(buff) && strlen(buff) > 0)
+						snprintf(buffer, preferred_size, "%s%c\"%s\"", buffer, (strlen(buffer)==1?' ':','), buff);
+
+					if(strlen(buffer) == preferred_size-1 && dCnt < (*offset)/preferred_size){
+						for(i=0; i < preferred_size; i++) buffer[i] = '\0';
+						dCnt ++;
+					}
+
+					j= nbBytes;					
+					nbBytes = get_next_resource_name_by_root(0, buff, preferred_size);
+
+					if(j == 0) snprintf(buffer, preferred_size, "%s]", buffer);
+				} 
+				/*
+				* We send if the fragmented packet to send is reached and full or if there is no more resource to add
+				*/
+				while((dCnt <= (*offset)/preferred_size && j != 0) && strlen(buffer) < preferred_size-1);
+				*offset += strlen(buffer);
+				if(strlen(buffer) < preferred_size-1) *offset = -1;
+
+				REST.set_response_payload(response, buffer, *offset);
+				responseCode = REST.status.OK;
+			}
+
+			/*
+			* Request for a particular resource
+			*/
+			else if (emma_resource_lock(uri))
 			{
 				if (emma_resource_open(uri))
 				{
@@ -256,7 +298,7 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 			it avoids to close multicast transaction for other nodes
 			*/
 
-			if((rq_flag & METHOD_POST) && emma_resource_open(uri) != -1 && !locked){
+			if((rq_flag & METHOD_POST) && emma_resource_exists(uri) && !locked){
 				PRINT("[HANDLER] Resource already exist, drop request !\n");
 				((coap_packet_t*)response)->mid = -1;
 				return;
@@ -335,6 +377,17 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 						}
 						else {
 							PRINT("Resource writing [FAILED]\n");
+							emmaCode = emma_resource_del(uri);
+							if (emmaCode==0)
+							{
+								emma_resource_set_last_modified(NULL, EMMA_SERVER_ID);
+							}
+							else
+							{
+								// TODO: Adapt error code according to the return value of 'emma_resource_del()'
+								PRINT("Unable to delete incomplete agent (code: %d)\n", emmaCode);
+								emma_resource_release(uri);
+							}
 							responseCode = REST.status.BAD_REQUEST;
 						}
 
