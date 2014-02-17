@@ -496,14 +496,20 @@ eval_status_t evaluate_block(num_eval_t* stack, uint8_t* block, uint8_t blockSiz
 		operandIndex = 0; // Reset operandIndex to detect "Out Of Buffer" elements (operand or operator)
 		while((cnt2 < EVAL_BUFFER_SIZE) && (cnt < blockSize))
 		{
-			if (block[cnt] == '\0') stack->buffer[cnt2] = '0';
-			else stack->buffer[cnt2] = block[cnt];
-			//PRINT("%c-", stack->buffer[cnt2]);
-			cnt2++;
-			cnt++;
+			if (block[cnt] == '\0') {
+				stack->buffer[cnt2] = '0';
+				cnt++;
+				cnt2++;
+			}
+			else if (block[cnt] == ' ') cnt++;
+			else {
+				stack->buffer[cnt2] = block[cnt];
+				cnt2++;
+				cnt++;
+			}
 		}
-		//PRINT("\n");
-		//PRINT("End of copy (cnt2=%d) (blockSize=%d)\n", cnt2, blockSize);
+		PRINT("\n");
+		PRINT("End of copy (cnt2=%d) (blockSize=%d)\n", cnt2, blockSize);
 		if ((cnt >= blockSize) && (cnt2 < EVAL_BUFFER_SIZE)) stack->buffer[cnt2] = '\0';
 		
 		cnt2=0;
@@ -539,7 +545,7 @@ eval_status_t evaluate_block(num_eval_t* stack, uint8_t* block, uint8_t blockSiz
 					
 					PRINT("[CALCULATOR] Computing operator ...\n");
 					error = eval_add_operator (stack, &(operators[cnt2]));
-					if (error != EVAL_READY) {operandIndex=0; return error;}
+					if (error != EVAL_READY) {operandIndex=0; printf("ERROR:%d \n", error); return error;}
 					PRINT("\n");
 				
 					// Increment
@@ -584,7 +590,11 @@ eval_status_t evaluate_block(num_eval_t* stack, uint8_t* block, uint8_t blockSiz
 		{
 			// The last element was an operand
 			error = eval_add_operand (stack, (stack->buffer + operandIndex), (stack->bufferIndex - operandIndex));
-			if (error != EVAL_READY) {operandIndex=0; return error;}
+			if (error != EVAL_READY) {
+				operandIndex=0; 
+				PRINT("PLOP\n");
+				return error;
+			}
 		}
 		
 		// Reset operand index: block-wise evalution finished
@@ -592,7 +602,11 @@ eval_status_t evaluate_block(num_eval_t* stack, uint8_t* block, uint8_t blockSiz
 		
 		// Try to simplify actual stack
 		error = eval_add_operator(stack, NULL);
-		if (error != EVAL_READY) {operandIndex=0; return error;}
+		if (error != EVAL_READY) {
+			operandIndex=0; 
+			PRINT("PLOP2 %d\n", error);
+			return error;
+		}
 		else
 		{
 			if (pop_operand(stack, result) == EVAL_READY)
@@ -601,11 +615,23 @@ eval_status_t evaluate_block(num_eval_t* stack, uint8_t* block, uint8_t blockSiz
 				if (pop_operand(stack, result) == EVAL_OPERAND_LIFO_OVF)
 				{
 					clean_stack(stack);
-					{operandIndex=0; return EVAL_COMPLETE;}
+					{
+						operandIndex=0;
+					PRINT("PLOP3\n"); 
+					return EVAL_COMPLETE;
+					}
 				}
-				else {operandIndex=0; return EVAL_PARSE_ERROR;}
+				else {
+					operandIndex=0;
+					PRINT("PLOP4\n"); 
+					return EVAL_PARSE_ERROR;
+				}
 			}
-			else {operandIndex=0; return EVAL_PARSE_ERROR;}
+			else {
+				operandIndex=0;
+				PRINT("PLOP5\n"); 
+				return EVAL_PARSE_ERROR;
+			}
 		}
 		
 		// Clean the stack

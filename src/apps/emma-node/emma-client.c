@@ -90,7 +90,7 @@ static uint8_t POSTmore = 0;
 
 //uint16_t POSTindex = 0;
 //uint8_t POSTtype = 0;
-//uint16_t POSTblockcnt = 0;
+//uint16_t POSTblockcnt_begin = 0;
 
 uip_ipaddr_t Broadcastaddr;
 
@@ -176,7 +176,8 @@ PROCESS_THREAD(emma_client_process, ev, data)
 							{
 								// Resource already locked by another process
 								state = EMMA_CLIENT_WAITING_MUTEX;
-								printf("Already locked %s\n", (char*)resource);
+								PRINT("Already locked %s\n", (char*)resource);
+								break;
 							}
 						}
 						else 
@@ -486,11 +487,11 @@ PROCESS_THREAD(emma_client_process, ev, data)
 #if UIP_CONF_IPV6
 static uint8_t addressCMP(uip_ipaddr_t* address1, uip_ipaddr_t* address2)
 {
-	uint8_t addressCnt = 0;
-	for (addressCnt=0 ; addressCnt<16 ; addressCnt++)
+	uint8_t addresscnt = 0;
+	for (addresscnt=0 ; addresscnt<16 ; addresscnt++)
 	{
-		if (address1->u8[addressCnt] > address2->u8[addressCnt]) return 1;
-		else if (address1->u8[addressCnt] < address2->u8[addressCnt]) return -1;
+		if (address1->u8[addresscnt] > address2->u8[addresscnt]) return 1;
+		else if (address1->u8[addresscnt] < address2->u8[addresscnt]) return -1;
 	}
 	return 0;
 }
@@ -499,11 +500,11 @@ static uint8_t addressCMP(uip_ipaddr_t* address1, uip_ipaddr_t* address2)
 uint8_t isLocalAddress(uip_ipaddr_t* address)
 {
 #if UIP_CONF_IPV6
-	uint8_t addressCnt = 0;
+	uint8_t addresscnt = 0;
 	uip_ipaddr_t loopback;
 
-	for (addressCnt=0 ; addressCnt<15 ; addressCnt++)
-		loopback.u8[addressCnt] = 0;
+	for (addresscnt=0 ; addresscnt<15 ; addresscnt++)
+		loopback.u8[addresscnt] = 0;
     loopback.u8[15] = 1;
 
 	// If it's me
@@ -511,9 +512,9 @@ uint8_t isLocalAddress(uip_ipaddr_t* address)
 		return 1;
 
 	//
-	for (addressCnt=0 ; addressCnt<UIP_DS6_ADDR_NB ; addressCnt++)
+	for (addresscnt=0 ; addresscnt<UIP_DS6_ADDR_NB ; addresscnt++)
 	{
-    if (uip_ds6_if.addr_list[addressCnt].isused && addressCMP(address, &(uip_ds6_if.addr_list[addressCnt].ipaddr)) == 0)
+    if (uip_ds6_if.addr_list[addresscnt].isused && addressCMP(address, &(uip_ds6_if.addr_list[addresscnt].ipaddr)) == 0)
     {
       return 1;
     }
@@ -786,7 +787,11 @@ eval_status_t client_solver (uint8_t* reference, uint8_t referenceSize, operand_
 	if (((reference != NULL) && (referenceSize != 0)) && (value != NULL))
 	{
 		snprintf(buffer, MIN(referenceSize + 1, EMMA_MAX_URI_SIZE), "%s", (char*)reference);
-		while(cnt < MIN(referenceSize + 1, EMMA_MAX_URI_SIZE)) {if(buffer[cnt]=='#')buffer[cnt]='/';cnt++;}
+		while(cnt < MIN(referenceSize + 1, EMMA_MAX_URI_SIZE)) {
+			if(buffer[cnt]=='#') buffer[cnt]='/';
+			if(buffer[cnt]==' ') buffer[cnt]='\0';
+			cnt++;
+		}
 		PRINTS("[REFERENCE SOLVER 2] Solving reference of '%s'\n", buffer);	
 		nbBytesRead = emma_resource_read(buffer, (uint8_t*)val, EMMA_INT_SIZE, 0);
 		for (cnt=0 ; cnt<nbBytesRead ; cnt++) PRINTS("%c-", (char)(val[cnt]));
@@ -817,6 +822,7 @@ typedef enum {
 	REPL_SHIFT_BUFFER,
 	REPL_FILL_BUFFER,
 	REPL_ANALYZE,
+	REPL_EXTRACT_URI,
 	REPL_COPY_BUFFER,
 	REPL_COPY_OPERAND,
 	REPL_ERROR,
@@ -836,26 +842,69 @@ void printState(repl_state_t state)
 	else 												{PRINT("[PRINT STATE] Unknown\n");}
 }
 
+/* pre_evaluate function
+* This function fill the output buffer according to the resource file name
+* It replace resource reference by its file to generate packet payload. 
+*
+*                  REPL_RAZ
+*                     |
+*                     v
+*              REPL_FILL_BUFFER   ->    REPL_ERROR
+*                     |
+*                     v
+* |----------->  REPL_ANALYZE
+* |                   |
+* |          ------------------
+* |          |                |
+* |          v                v
+* | REPL_COPY_BUFFER <- REPL_COPY_OPERAND
+* |          |
+* |          v
+* --REPL_SHIFT_BUFFER ----> REPL_END
+*/
+
+char
+isDelimiter(char c){
+	if(c == ':' || c == '"' || c == ' ' || c == '\'' || c == ',' || c == '{' || c == '}' || c == '[' || c == ']')
+		return 1;
+	return 0;
+}
+
+enum{
+	NO_REF,
+	REF_BEGIN_CURRENT,
+	REF_BEGIN_NEXT,
+	REF_END
+};
 
 uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter)
 {
 	// Variables
 	static char* nam = NULL;							// Name of initial resource
 	static emma_index_t namIndex=0;						// Read index of name resource
-	static char ref[EMMA_MAX_URI_SIZE+1];							// Pointer on reference resource
+	static uint8_t ref[EMMA_MAX_URI_SIZE+1];							// Pointer on reference resource
+	static uint8_t var_build = 0;
 	static emma_index_t refIndex=0;						// Read index of reference resource
 	
 	static repl_state_t currentState = REPL_RAZ;
 	static uint8_t buffer[REPL_BUFFER+1];	// Evaluated expression buffer
+	static uint8_t buffer2[REPL_BUFFER+1];	// Evaluated expression buffer
+
+
 	static uint8_t bufferIndex = 0;
 	static uint8_t copyIndex = 0;					// Index used for copy
-	
+	static int8_t  cnt_end_next;
+	 
+
 	uint8_t outputCond = 0;								// Output condition boolean
 	uint8_t outputIndex = 0;							// Index on output buffer
 	
 	int nbBytesRead = 0;
-	uint8_t cnt = 0;
-	char tempC;
+	static int8_t cnt_begin = 0, FLAG, pos, buffer_length, i;
+	static char tempC;
+	char *tmp;
+
+	int8_t sens = 0, cnt_end;
 	//resource_t* res = NULL;
 	
 	if (! block){PRINT("No index.\n"); return 0;}
@@ -875,22 +924,33 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		//PRINT("\n");printState(currentState);
 		if (currentState == REPL_RAZ)
 		{
+			//PRINT("REPL_RAZ \n");
 			// Reset all static variables
 			currentState = REPL_FILL_BUFFER;
-			ref[0] = '\0';
 			refIndex = 0;
 			bufferIndex = 0;
 			buffer[REPL_BUFFER] = '\0';
+			cnt_end_next = 0;
 			copyIndex = 0;
+			var_build = 0;
+			for (cnt=0; cnt < EMMA_MAX_URI_SIZE; cnt ++)
+				ref[cnt] = '\0';
 		}
 		
-		// SHIFT BUFFER
+		/* REPL_SHIFT_BUFFER
+		*  Add data from resource file into buffer according o bufferIndex
+		*/
 		else if (currentState == REPL_SHIFT_BUFFER)
 		{
+			//PRINT("REPL_SHIFT_BUFFER\n");
 			if ((strlen((char*)buffer) < REPL_BUFFER) && (buffer[bufferIndex] == '\0'))
 			{
-				currentState=REPL_END;
-				outputCond=1;
+				if(strlen(ref) > 0)
+					currentState=REPL_ANALYZE;
+				else {
+					currentState=REPL_END;
+					outputCond=1;
+					}
 			}
 			else
 			{
@@ -910,14 +970,15 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			}
 		}
 		
-		/* FILL BUFFER
-		Copy data from resource into free buffer space
+		/* REPL_FILL_BUFFER
+		* Copy resource file into free buffer space
 		*/
 		else if (currentState == REPL_FILL_BUFFER)
 		{
+			//PRINT("REPL_FILL_BUFFER\n");
 			if (bufferIndex < REPL_BUFFER)
 			{
-				// Fill buffer with initial resource
+				// Fill buffer with initial resource file
 				nbBytesRead = getter(nam, buffer+bufferIndex, REPL_BUFFER-bufferIndex, namIndex);
 				namIndex += nbBytesRead;
 				*block = namIndex;
@@ -930,54 +991,209 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 				while ((cnt < REPL_BUFFER) && (buffer[cnt] != REPL_EOB)) cnt++;
 				if (buffer[cnt] == REPL_EOB)
 				{
-					buffer[cnt] = '\0';
+					//buffer[cnt] = '\0';
 					*block -= (nbBytesRead - cnt);
 					*block+=1;
 					PRINT("EOB FOUND ; readIndex=%d\n", *block);
 				}
-				
-				
+
+				/******************** CLEAN BUFFER **********************
+				* If the new buffer contains the end of previous resource reference
+				*/
+
+				/* There is the end of a resource reference in new buffer, we clean it */
+				if(cnt_end_next != 0) {
+					for(cnt=0; cnt < cnt_end_next; cnt ++)
+						if(buffer[cnt] != '\0')
+							buffer[cnt] = ' ';
+					cnt_end_next = 0;
+				}
+				/*******************************************************/
 				bufferIndex = 0;
 				currentState = REPL_ANALYZE;
 			}
 			else currentState = REPL_ERROR;
 		}
 		
-		/* ANALYZE
-		Look for operators and operands, select 
+		/* REPL_ANALYZE
+		* Extract the resource reference into ref buffer and replace the resource reference by escapes 
+		* If there is a reference, the state REPL_COPY_OPERAND will transmit the resource file
+		* Else the buffer is directly send by the state REPL_COPY_BUFFER
 		*/
 		else if (currentState == REPL_ANALYZE)
 		{
-			find_operator(buffer, strlen((char*)buffer), &bufferIndex);
-			tempC = buffer[bufferIndex];
-			buffer[bufferIndex] = '\0';
-			cnt=0;while(buffer[cnt]!='\0' && cnt<EMMA_MAX_URI_SIZE) // Invert # with / 
-			{
-				ref[cnt] = buffer[cnt];
-				if(ref[cnt]=='#')ref[cnt]='/';
-				cnt++;
+			//PRINT("REPL_ANALYZE \n");
+			if(strlen(ref) > 0){
+				currentState = REPL_COPY_OPERAND;
+				copyIndex = bufferIndex; 
+				for(i=strlen(buffer); i < REPL_BUFFER; i++)
+					buffer[i] = ' ';
+				buffer[i] = '\0';
 			}
-			ref[cnt] = '\0';
-			buffer[bufferIndex] = tempC;
-			if (solver(ref)) {copyIndex = bufferIndex;currentState = REPL_COPY_OPERAND;}
-			else {copyIndex = 0;currentState = REPL_COPY_BUFFER;}
+			else {
+				find_operator(buffer, strlen((char*)buffer), &bufferIndex);
+
+				tempC = buffer[bufferIndex];
+				buffer[bufferIndex] = '\0';
+				FLAG = NO_REF;
+
+				getter(nam, buffer2, REPL_BUFFER+1, namIndex);
+				buffer2[REPL_BUFFER+1] = '\0';
+
+				if(strstr(buffer, "#") != NULL){
+					currentState = REPL_EXTRACT_URI; 
+					FLAG = REF_BEGIN_CURRENT;
+				}
+
+				else if(strstr(buffer2, "#") != NULL){
+					for(cnt_begin=0; cnt_begin < REPL_BUFFER; cnt_begin ++)
+						if(isDelimiter(buffer2[cnt_begin]))
+							break;
+						else if (buffer2[cnt_begin] == '#')
+							FLAG = REF_BEGIN_NEXT;	
+
+					if(FLAG == REF_BEGIN_NEXT){
+						currentState = REPL_EXTRACT_URI; 
+					}
+					else {
+						buffer[bufferIndex] = tempC;
+						copyIndex = 0;
+						currentState = REPL_COPY_BUFFER;
+					}
+				}
+				else 
+				{
+					buffer[bufferIndex] = tempC;
+					copyIndex = 0;
+					currentState = REPL_COPY_BUFFER;
+				}	
+			}
 		}
-		
-		// COPY BUFFER
+
+		else if (currentState == REPL_EXTRACT_URI)
+		{
+			//PRINT("REPL_EXTRACT_URI\n");
+
+			copyIndex = 0;
+			currentState = REPL_COPY_BUFFER;
+
+			/************************* FIND REFERENCE ********************************/
+			buffer_length = strlen(buffer);
+
+			/* Compute the position of reference delimiter # */
+			if(FLAG == REF_BEGIN_CURRENT){            		
+				tmp = strstr(buffer, "#");
+				pos = (char*)tmp - (char*)buffer;
+				if(pos == NULL){
+					PRINT("ERROR UNKNOWN 1\n");
+					return;
+				}
+			}
+			/* Set the position of delimiter # in the next buffer */
+			else if(FLAG == REF_BEGIN_NEXT)	{			
+				pos = buffer_length;
+				buffer[pos] = tempC;
+			}
+
+			/* Find the begining and build resource reference */
+			for(cnt_begin=pos; cnt_begin >= 0; cnt_begin--) 			
+				if(isDelimiter(buffer[cnt_begin]))  break;
+
+			for(cnt_end=++cnt_begin; cnt_end < buffer_length; cnt_end++){
+				if(isDelimiter(buffer[cnt_end])) {
+					FLAG = REF_END;
+					break;
+				}
+				ref[cnt_end-cnt_begin] = buffer[cnt_end];			
+			}
+			ref[cnt_end-cnt_begin] = '\0';
+
+			/* If there is no more packet and the resource reference is at the end */
+			if(buffer_length < REPL_BUFFER){
+				PRINT("Found end resource due to end buffer\n");
+				FLAG = REF_END;
+			}
+
+			/* Extract the end of resource reference in next buffer */
+			else if(FLAG != REF_END)
+			{
+				getter(nam, buffer2, REPL_BUFFER, namIndex);
+				buffer2[REPL_BUFFER] = '\0';
+
+				PRINT("Looking for end resource reference in next buffer\n");
+				for(cnt_end_next=0; cnt_end_next < REPL_BUFFER; cnt_end_next ++){
+					if(isDelimiter(buffer2[cnt_end_next])) {
+						FLAG = REF_END;
+						break;
+					}
+				ref[cnt_end - cnt_begin + cnt_end_next] = buffer2[cnt_end_next];
+				}
+			ref[cnt_end - cnt_begin + cnt_end_next] = '\0';
+			}
+
+			/************************ PREPARE REFERENCE ********************************/
+			for (i = 0; i < strlen(ref); i ++)
+				if(ref[i] == '#') ref[i] = '/';
+			PRINT("\nURI extraction : %s\n", ref);
+
+			/************************* SOLVE REFERENCE *********************************/
+			if (FLAG == REF_END)
+			{
+
+				if(solver(ref)){
+					PRINT("Resource found %s\n", ref);
+					// Replace variable name 
+					for (cnt_begin=cnt_begin; cnt_begin < REPL_BUFFER; cnt_begin ++)
+						if(buffer[cnt_begin] != '\0')
+							buffer[cnt_begin] = ' ';	
+					}
+				else {
+					PRINT("Resource not found %s\n", ref);
+					buffer[bufferIndex] = tempC != '\0'? tempC : '\0';
+				}
+
+			/* 
+				If there is some data after the resource reference,
+				we shit the buffer to process it on the next packet
+			*/
+			if(cnt_end < REPL_BUFFER){
+				//namIndex -=  (REPL_BUFFER - cnt_end);	
+				namIndex -=  ((tempC == '\0' ? buffer_length : REPL_BUFFER) - cnt_end);
+				for(i=cnt_end; i < (tempC == '\0' ? buffer_length : REPL_BUFFER); i++)
+					buffer[i] = ' ';
+				}
+			}
+			// Resource not found because : it is incomplete
+			else PRINT("ERROR Unable to extract resource reference\n");
+			
+			/********************** CHECK MULTI REFERENCE ******************************/
+		}
+
+		/*
+		* COPY BUFFER
+		* This function copy directly from the buffer to the ouputput buffer which will be transmited
+		*/
 		else if (currentState == REPL_COPY_BUFFER)
 		{
+			//PRINT("REPL_COPY_BUFFER (%d): %s\n", copyIndex, buffer);
 			cnt=copyIndex;
 			
 			// Skip copy buffer to output if there is a local variable to replace
-			while ((cnt<=bufferIndex) && (outputIndex<outputSize) && (buffer[cnt] != '\0'))
+			while ((cnt<=bufferIndex) && (outputIndex<outputSize) && (buffer[cnt] != '\0') && (buffer[cnt] != REPL_EOB))
 			{
-				//PRINT("%c-", buffer[cnt]);
 				output[outputIndex] = buffer[cnt];
+				if(output[outputIndex] == '\'')
+					output[outputIndex] = '"';
+
 				cnt++;
 				outputIndex++;
 			}
 			copyIndex = cnt;
-			if (outputIndex >= outputSize) {outputCond=1;}
+			if (outputIndex >= outputSize || (buffer[cnt] == REPL_EOB)) {
+				outputCond=1;
+				if (buffer[cnt] == REPL_EOB)
+					currentState = REPL_END;
+			}
 			else
 			{
 				if (buffer[cnt] != '\0') bufferIndex++;
@@ -985,24 +1201,31 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			}
 		}
 		
-		// COPY OPERAND
+		/*
+		* REPL_COPY_OPERAND
+		* Replace the resource reference by its file value
+		*/
+
 		else if (currentState == REPL_COPY_OPERAND)
 		{
+			//PRINT("REPL_COPY_OPERAND %d: %s\n", refIndex, buffer);
 
-			if (solver(ref)) nbBytesRead = getter(ref, output+outputIndex, outputSize-outputIndex, refIndex);
-			else nbBytesRead = getter(NULL, output+outputIndex, outputSize-outputIndex, refIndex);
+			if (solver(ref)) {
+				nbBytesRead = getter(ref, output+outputIndex, outputSize-outputIndex, refIndex);
+			}
+			else {
+				nbBytesRead = getter(NULL, output+outputIndex, outputSize-outputIndex, refIndex);
+			}
 			refIndex += nbBytesRead;
 			outputIndex += nbBytesRead;
 			
-			// Search end of block character
-			cnt = 0;
-//			while ((cnt < outputIndex) && (output[cnt] != REPL_EOB)) cnt++;
-//			if (output[cnt] == REPL_EOB) outputIndex = cnt;
-			
-			if (outputIndex == outputSize) {outputCond = 1;}
+			if (outputIndex == outputSize) {
+				outputCond = 1;
+			}
 			else
 			{
 				refIndex = 0;
+				ref[0] = '\0';
 				currentState = REPL_COPY_BUFFER;
 			}
 		}
@@ -1010,6 +1233,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		// ERROR
 		else if (currentState == REPL_ERROR)
 		{
+			//PRINT("REPL_ERROR \n");
 			// Print all variables to see DEBUG
 			//PRINT("\n\n");
 			//PRINT("[REPLACER] nam: %s ; namIndex=%d\n", nam, namIndex);
@@ -1025,6 +1249,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		// END
 		else if (currentState == REPL_END)
 		{
+			PRINT("REPL_END \n");
 			outputCond=1;
 			outputIndex = 0;
 			//PRINT("END OF REPLACER ; readIndex=%d\n", *block);

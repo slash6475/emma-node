@@ -23,7 +23,7 @@
 #include "cfs/cfs-coffee.h"
 #include <string.h>
 
-#define LDEBUG 1
+#define LDEBUG 0
 #if (LDEBUG | GDEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[ROOT AGENT] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)

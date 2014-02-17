@@ -49,6 +49,13 @@ MEMB(root_resource_R, root_resource_t, ROOT_RESOURCE_MAX_ALLOC);
 
 /* TODO */
 #define EMMA_INT_SIZE	9
+
+void arrayShift(char* array, uint8_t length, uint8_t pos){
+	int i;
+	for (i=pos; i < length - 1; i++)
+		array[i] = array[i+1];
+}
+
 eval_status_t root_resource_solver (uint8_t* reference, uint8_t referenceSize, operand_t* value)
 {
 	char buffer[EMMA_MAX_URI_SIZE];
@@ -64,7 +71,18 @@ eval_status_t root_resource_solver (uint8_t* reference, uint8_t referenceSize, o
 			if (buffer[0] == 'R' && buffer[1]=='#') buffer[0]='L';
 			//else PRINT("[REFERENCE SOLVER] No translation R -> L\n");
 		}
-		while(cnt < MIN(referenceSize + 1, EMMA_MAX_URI_SIZE)) {if(buffer[cnt]=='#')buffer[cnt]='/';cnt++;}
+		while(cnt < MIN(referenceSize + 1, EMMA_MAX_URI_SIZE)) {
+			if(buffer[cnt]=='#')buffer[cnt]='/';
+
+			else if(buffer[cnt]==' '){
+				arrayShift(buffer, EMMA_MAX_URI_SIZE, cnt);
+			}
+			else cnt++;
+		}
+//		for(cnt=strlen(buffer)-1; cnt > 0; cnt --)
+//			if(buffer[cnt] == ' ') buffer[cnt] = '\0';
+//			else break;
+
 		PRINT("[REFERENCE SOLVER] Solving reference of '%s'\n", buffer);
 		/*nbBytesRead = rest_get_data_block(buffer, (uint8_t*)value, sizeof(operand_t), 0, NULL);
 		if (nbBytesRead == 4)

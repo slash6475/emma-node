@@ -142,12 +142,13 @@ void root_system_reset(void* data)
 	
 }
 
+#define BUFF_SIZE 64
 int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_t block_size, emma_index_t block_index)
 {
 	uint16_t a;
 	int8_t i, j, k, f, first=1;
 	int nbBytesRead = 0, Count=0, offset = 0;
-	char buff[block_size];
+	char buff[BUFF_SIZE];
 
 	char* resource = emma_get_resource_name(uri);
 
@@ -174,7 +175,7 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 			if(uip_ds6_nbr_cache[i].isused) 
 			{
 				buff[0] = '\0';
-				ipaddr_add(buff, &uip_ds6_nbr_cache[i].ipaddr, block_size);
+				ipaddr_add(buff, &uip_ds6_nbr_cache[i].ipaddr, BUFF_SIZE);
 
 				/*
 				   Compute remaided space in packet payload with the current content and the adress ip in buff with the 2 separators
@@ -192,6 +193,7 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 				*/
 				if(offset <= 0 && Count == block_index / block_size) 
 					return strlen(data_block)+1;
+				
 
 				/* 
 				   If this is the address which has been splited at the previous packet sending,
@@ -208,6 +210,7 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	/*
 	No more packet to send, we end JSON table and send it
 	*/
+	if(Count < block_index / block_size) data_block[0] = '\0';
 	snprintf(data_block, block_size, "%s]",data_block);
 	return strlen(data_block)+1;
 	}
@@ -265,6 +268,7 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	No more packet to send, we end JSON table and send it
 	*/
 	snprintf(data_block, block_size, "%s]",data_block);
+
 	return strlen(data_block)+1;
 	}
 	return 0;

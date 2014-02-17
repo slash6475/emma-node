@@ -388,6 +388,8 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 								PRINT("Unable to delete incomplete agent (code: %d)\n", emmaCode);
 								emma_resource_release(uri);
 							}
+							locked = 0;
+							opened = 0;
 							responseCode = REST.status.BAD_REQUEST;
 						}
 
@@ -401,27 +403,6 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 
 							if((rq_flag & METHOD_POST))
 								responseCode = REST.status.CREATED;
-
-							/*
-							Check if the the agent is uncompleted and then delete it
-							*
-
-							for(i=0; i < block_num || i > 63; i++)
-								if(!(count & (1<<i))){
-									PRINT("[HANDLER] Lost packet (%d) or too many packet (64) => Cancel transaction\n", i);
-									if (!emma_resource_del(uri))
-										emma_resource_set_last_modified(NULL, EMMA_SERVER_ID);
-
-									else {
-										PRINT("Timeout - Unable to delete partial resource %s\n", uri);
-										emma_resource_release(uri);
-										}
-									opened = 0;
-									locked = 0;	
-									((coap_packet_t*)response)->mid = -1;
-									return;
-									}
-									*/
 						}
 					}
 					else
