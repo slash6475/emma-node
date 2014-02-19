@@ -23,7 +23,7 @@
 #include "cfs/cfs-coffee.h"
 #include <string.h>
 
-#define LDEBUG 0
+#define LDEBUG 1
 #if (LDEBUG | GDEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[ROOT AGENT] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)
@@ -149,7 +149,10 @@ static uint8_t root_agent_analyze_block(char* uri, root_agent_t* agent, uint8_t*
 		
 		for (patternCnt=0 ; patternCnt < SIZEOF_STATIC(agent_patterns) ; patternCnt++)
 		{
-			if (data_block[cnt] == agent_patterns[patternCnt][agent->patternIndex[patternCnt]]) agent->patternIndex[patternCnt]++;
+			if (data_block[cnt] == agent_patterns[patternCnt][agent->patternIndex[patternCnt]]
+//				&& !(patternCnt == 0 && strlen(agent->patternIndex) > 0) 
+				) 
+				agent->patternIndex[patternCnt]++;
 			else agent->patternIndex[patternCnt] = 0;
 			if (agent_patterns[patternCnt][agent->patternIndex[patternCnt]] == '\0')
 			{

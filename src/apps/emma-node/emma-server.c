@@ -326,7 +326,7 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 						responseCode = REST.status.SERVICE_UNAVAILABLE;						
 					}
 
-					count = 0;
+					count = -1;
 					emma_resource_add(emma_get_resource_root(uri), emma_get_resource_name(uri));
 					if (!locked)  locked = emma_resource_lock(uri);
 					if (!opened)  opened = emma_resource_open(uri);
@@ -357,6 +357,7 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 					return;
 					}
 
+
 				/*
 				----------------------------------------------------------------------
 				RESOURCE WRITING in PERMANENT MEMORY
@@ -366,7 +367,13 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 				if (locked)
 				{
 					if (opened)
-					{
+					{	
+						if(block_num == count){
+							PRINT("Packet already proceeded, just ignore it \n");
+							responseCode = REST.status.OK;
+							return;
+						}
+
 						PRINT("[HANDLER] PUT '%s' ; payload='", uri);
 						for(dCnt=0 ; dCnt<payloadSize ; dCnt++) PRINTS("%c",(char)(payload[dCnt]));
 						PRINTS("'\n");

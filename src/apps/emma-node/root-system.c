@@ -40,7 +40,7 @@ typedef struct rootAgent {
 	int value;
 } root_system_t;
 
-#define ROOT_SYSTEM_MAX_ALLOC 5
+#define ROOT_SYSTEM_MAX_ALLOC 6
 MEMB(root_system_R, root_system_t, ROOT_SYSTEM_MAX_ALLOC);
 #define ROOT_MEM_INIT() memb_init(&root_system_R)
 #define ROOT_FREE(r) memb_free(&root_system_R, r)
@@ -61,6 +61,7 @@ void root_system_init() {
 	emma_resource_add(emma_get_resource_root("S/rand"), 	emma_get_resource_name("S/rand"));
 	emma_resource_add(emma_get_resource_root("S/time"), 	emma_get_resource_name("S/time"));
 	emma_resource_add(emma_get_resource_root("S/neighbor"), emma_get_resource_name("S/neighbor"));
+	emma_resource_add(emma_get_resource_root("S/routes"), 	emma_get_resource_name("S/routes"));
 	emma_resource_add(emma_get_resource_root("S/resources"), emma_get_resource_name("S/resources"));
 
 	process_start(&emma_system_process, NULL);
@@ -152,25 +153,41 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 
 	char* resource = emma_get_resource_name(uri);
 
+	/*
+	* RESOURCE time
+	* Return the current runtime in second
+	*/
 	if(strncmp(resource, "time\0", 4) == 0)
 	{
 		return snprintf(data_block, block_size, "%d", clock_seconds());
 
 	} 
+	/*
+	* RESOURCE rand
+	* Return a random number
+	*/
 	else if(strncmp(resource, "rand\0",4) == 0)
 	{
 		return snprintf(data_block, block_size, "%d", random_rand());
 
 	} 
+	/*
+	* RESOURCE info
+	* Return Contiki and Emma configuration
+	*/
 	else if(strncmp(resource, "info\0",4) == 0)
 	{
 		return snprintf(data_block, block_size, "{\"EMMA_CLIENT_POLLING_INTERVAL\":%d,\"EMMA_MAX_URI_SIZE\":%d}", EMMA_CLIENT_POLLING_INTERVAL, EMMA_MAX_URI_SIZE);
 	}
+	/*
+	* RESOURCE neighbor
+	* Return the neighbor table
+	*/
 	else if(strncmp(resource, "neighbor\0", 8) == 0)
 	{
 		Count = 0;
 		snprintf(data_block, block_size, "[");
-		for(i = 0,j=1; i < UIP_DS6_NBR_NB; i++) 
+		for(i = 0; i < UIP_DS6_NBR_NB; i++) 
 		{
 			if(uip_ds6_nbr_cache[i].isused) 
 			{
@@ -215,6 +232,78 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	return strlen(data_block)+1;
 	}
 
+	/*
+	* RESOURCE routes
+	* Return the route table
+	*/
+	else if(strncmp(resource, "routes\0", 8) == 0)
+	{
+		Count = 0;
+		snprintf(data_block, block_size, "[");
+
+  		for(i = 0; i < UIP_DS6_ROUTE_NB; i++) 
+  		{
+  			for(j=0; j < 2; j++)
+	   			if(uip_ds6_routing_table[i].isused) 
+	   			{
+	   				if(first)
+						snprintf(data_block, block_size, "%s{",data_block);
+
+					buff[0] = '\0';
+					ipaddr_add(buff, ((j==0)?&uip_ds6_routing_table[i].ipaddr: &uip_ds6_routing_table[i].nexthop), BUFF_SIZE);
+
+					/*
+					   Compute remaided space in packet payload with the current content and the adress ip in buff with the 2 separators
+					*/
+					offset = block_size - strlen(data_block) - strlen(buff) - 4;
+					snprintf(data_block, block_size, "%s%s\"%s%c", data_block, 
+						(!first? (j==0?"},{":" : "):"   "), 
+						buff ,
+						(offset>0 ? '"':' '));
+					/*
+					   We start writing at the \0 added by snprintf if we can add other contain
+					*/
+					if(offset>0) offset --;
+
+					/* 
+					   If the current address has been splited because payload is full, we send the packet
+					*/
+					if(offset <= 0 && Count == block_index / block_size) 
+						return strlen(data_block)+1;
+
+					/* 
+					   If this is the address which has been splited at the previous packet sending,
+					   We add it at the begining of the packet before adding the next address
+					*/
+					else if(offset <= 0 && Count < block_index / block_size){
+						Count ++;
+						k = ((int8_t)strlen(buff) + offset - 1);
+						if(k > 0) //strlen(buff) + offset - 1
+							snprintf(data_block, block_size, "%s\"", buff+(strlen(buff) + offset - 1));
+						
+						else {
+							snprintf(data_block, block_size, "%c", data_block[strlen(data_block)-1]=='"'?' ':'"');
+							if(j) j--;
+							else { i--; j++;}
+						}
+					}
+					if(first) first = 0;
+				}
+		}
+
+	/*
+	No more packet to send, we end JSON table and send it
+	*/
+	if(Count < block_index / block_size) data_block[0] = '\0';
+
+	snprintf(data_block, block_size, "%s}]", data_block);
+	return strlen(data_block)+1;
+	}
+
+	/*
+	* RESOURCE resources
+	* Return the resource table
+	*/
 	else if(strncmp(resource, "resources\0", 8) == 0)
 	{
 	Count = 0;

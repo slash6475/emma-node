@@ -23,7 +23,7 @@
 #include "er-coap-07.h"
 #include "er-coap-07-engine.h"
 
-#define LDEBUG 1
+#define LDEBUG 0
 #if (LDEBUG | GDEBUG | CLIENT_DEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[EMMA CLIENT] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)
@@ -34,10 +34,10 @@
 	#define PRINT6ADDR(addr)
 #endif
 
-#define EMMA_CLIENT_BUFFER_SIZE	16
-#define CLIENT_GET	1
-#define CLIENT_PUT	2
-#define CLIENT_POST	3
+#define EMMA_CLIENT_BUFFER_SIZE	REST_MAX_CHUNK_SIZE
+#define CLIENT_GET		1
+#define CLIENT_PUT		2
+#define CLIENT_POST		3
 #define CLIENT_DELETE	4
 
 
@@ -930,6 +930,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			refIndex = 0;
 			bufferIndex = 0;
 			buffer[REPL_BUFFER] = '\0';
+			buffer2[REPL_BUFFER] = '\0';
 			cnt_end_next = 0;
 			copyIndex = 0;
 			var_build = 0;
@@ -942,7 +943,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		*/
 		else if (currentState == REPL_SHIFT_BUFFER)
 		{
-			//PRINT("REPL_SHIFT_BUFFER\n");
+			PRINT("REPL_SHIFT_BUFFER\n");
 			if ((strlen((char*)buffer) < REPL_BUFFER) && (buffer[bufferIndex] == '\0'))
 			{
 				if(strlen(ref) > 0)
@@ -975,7 +976,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		*/
 		else if (currentState == REPL_FILL_BUFFER)
 		{
-			//PRINT("REPL_FILL_BUFFER\n");
+			PRINT("REPL_FILL_BUFFER\n");
 			if (bufferIndex < REPL_BUFFER)
 			{
 				// Fill buffer with initial resource file
@@ -1022,7 +1023,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		*/
 		else if (currentState == REPL_ANALYZE)
 		{
-			//PRINT("REPL_ANALYZE \n");
+			PRINT("REPL_ANALYZE \n");
 			if(strlen(ref) > 0){
 				currentState = REPL_COPY_OPERAND;
 				copyIndex = bufferIndex; 
@@ -1072,7 +1073,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 
 		else if (currentState == REPL_EXTRACT_URI)
 		{
-			//PRINT("REPL_EXTRACT_URI\n");
+			PRINT("REPL_EXTRACT_URI\n");
 
 			copyIndex = 0;
 			currentState = REPL_COPY_BUFFER;
@@ -1175,7 +1176,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		*/
 		else if (currentState == REPL_COPY_BUFFER)
 		{
-			//PRINT("REPL_COPY_BUFFER (%d): %s\n", copyIndex, buffer);
+			PRINT("REPL_COPY_BUFFER (%d): %s\n", copyIndex, buffer);
 			cnt=copyIndex;
 			
 			// Skip copy buffer to output if there is a local variable to replace
@@ -1197,6 +1198,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			else
 			{
 				if (buffer[cnt] != '\0') bufferIndex++;
+				if(outputIndex == outputSize) outputCond = 1;
 				currentState = REPL_SHIFT_BUFFER;
 			}
 		}
@@ -1208,7 +1210,13 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 
 		else if (currentState == REPL_COPY_OPERAND)
 		{
-			//PRINT("REPL_COPY_OPERAND %d: %s\n", refIndex, buffer);
+			PRINT("REPL_COPY_OPERAND %d, %d, %d '%s): %s\n", refIndex, outputSize, outputIndex, ref, buffer);
+			if(outputIndex > 0){
+				while(outputIndex < outputSize)
+					output[outputIndex++]= ' ';
+				output[--outputIndex]= '\0';
+			}
+
 
 			if (solver(ref)) {
 				nbBytesRead = getter(ref, output+outputIndex, outputSize-outputIndex, refIndex);
