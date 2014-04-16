@@ -26,7 +26,7 @@
 
 #include <string.h>
 
-#define LDEBUG 1
+#define LDEBUG TRUE   
 #if (LDEBUG | GDEBUG | SERVER_DEBUG)
 	#define PRINT(...) OUTPUT_METHOD("[EMMA SERVER] " __VA_ARGS__)
 	#define PRINTS(...) OUTPUT_METHOD(__VA_ARGS__)
@@ -325,7 +325,7 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 						return;
 						responseCode = REST.status.SERVICE_UNAVAILABLE;						
 					}
-
+printf("AGENT %s reception\n", uri);
 					count = -1;
 					emma_resource_add(emma_get_resource_root(uri), emma_get_resource_name(uri));
 					if (!locked)  locked = emma_resource_lock(uri);
@@ -404,6 +404,7 @@ void emma_server_handler(void* request, void* response, uint8_t *buffer, uint16_
 
 						if (!more)
 						{
+printf("AGENT %s reception end\n", uri);
 							emma_resource_set_last_modified(uri, EMMA_SERVER_ID);
 							emma_resource_close(uri);
 							emma_resource_release(uri); locked = 0;

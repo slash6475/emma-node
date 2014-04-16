@@ -57,7 +57,7 @@ PROCESS(emma_system_process, "Emma System Process");
 void root_system_init() {
 	ROOT_MEM_INIT();
 
-	emma_resource_add(emma_get_resource_root("S/info"), 	emma_get_resource_name("S/info"));
+	emma_resource_add(emma_get_resource_root("S/ns-uri"), 	emma_get_resource_name("S/ns-uri"));
 	emma_resource_add(emma_get_resource_root("S/rand"), 	emma_get_resource_name("S/rand"));
 	emma_resource_add(emma_get_resource_root("S/time"), 	emma_get_resource_name("S/time"));
 	emma_resource_add(emma_get_resource_root("S/neighbor"), emma_get_resource_name("S/neighbor"));
@@ -175,9 +175,9 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	* RESOURCE info
 	* Return Contiki and Emma configuration
 	*/
-	else if(strncmp(resource, "info\0",4) == 0)
+	else if(strncmp(resource, "ns-uri\0",4) == 0)
 	{
-		return snprintf(data_block, block_size, "{\"EMMA_CLIENT_POLLING_INTERVAL\":%d,\"EMMA_MAX_URI_SIZE\":%d}", EMMA_CLIENT_POLLING_INTERVAL, EMMA_MAX_URI_SIZE);
+		return snprintf(data_block, block_size, "\"http://localhost/emma/registry/ns-uri1.xml\"");
 	}
 	/*
 	* RESOURCE neighbor
@@ -295,8 +295,9 @@ int root_system_read(char* uri, void* user_data, uint8_t* data_block, emma_size_
 	No more packet to send, we end JSON table and send it
 	*/
 	if(Count < block_index / block_size) data_block[0] = '\0';
-
-	snprintf(data_block, block_size, "%s}]", data_block);
+	else if (strlen(data_block) == 1 && data_block[0] == '[')
+			snprintf(data_block, block_size, "%s]", data_block);
+	else 	snprintf(data_block, block_size, "%s}]", data_block);
 	return strlen(data_block)+1;
 	}
 

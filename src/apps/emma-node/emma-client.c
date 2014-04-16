@@ -110,7 +110,7 @@ typedef uint8_t (* repl_solver) (char* symbol);
 
 // Function pointer to read a resource on node (identified by name) (use 'emma_resource_read')
 typedef int (* repl_getter) (char* name, uint8_t* data_block, uint16_t block_size, emma_index_t block_index);
-uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter);
+uint8_t preprocessor (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter);
 
 void emma_client_init()
 {
@@ -249,6 +249,7 @@ PROCESS_THREAD(emma_client_process, ev, data)
 					
 						while (code && pre)
 						{
+printf("AGENT %s starting\n", resource);
 							// Address found, send POST
 							PRINT("[RUN] Address:  "); PRINT6ADDR(TARGETadd.u8); PRINTS("\n");
 							PRINT("[RUN] Uri: '%s'\n", TARGETuri);
@@ -289,8 +290,8 @@ PROCESS_THREAD(emma_client_process, ev, data)
 									if (POSTpreEvaluate == PRE_EVALUATED_SEND)
 									{
 										PRINT("POST Expression\n");
-										if (POSTblockNum == 0){POSTstartIndex++; POSTnbBytesRead = pre_evaluate (resource, &POSTstartIndex, POSTblock, EMMA_CLIENT_BUFFER_SIZE, emma_resource_exists, emma_resource_read);}
-										else {POSTnbBytesRead = pre_evaluate (NULL, &POSTstartIndex, POSTblock, EMMA_CLIENT_BUFFER_SIZE, emma_resource_exists, emma_resource_read);}
+										if (POSTblockNum == 0){POSTstartIndex++; POSTnbBytesRead = preprocessor (resource, &POSTstartIndex, POSTblock, EMMA_CLIENT_BUFFER_SIZE, emma_resource_exists, emma_resource_read);}
+										else {POSTnbBytesRead = preprocessor (NULL, &POSTstartIndex, POSTblock, EMMA_CLIENT_BUFFER_SIZE, emma_resource_exists, emma_resource_read);}
 									}
 									else if (POSTpreEvaluate == RAW_SEND)
 									{
@@ -335,7 +336,10 @@ PROCESS_THREAD(emma_client_process, ev, data)
 									
 									coap_set_header_block1(request, POSTblockNum, POSTmore, EMMA_CLIENT_BUFFER_SIZE);
 									coap_set_payload(request, POSTblock, POSTnbBytesRead);
-							
+if(POSTblockNum == 0)
+printf("AGENT %s sending request to %s\n", resource, TARGETuri);
+if(POSTmore == 0)
+printf("AGENT %s sending request end\n", resource);
 									// Send packet
 									if (isLocalAddress(&TARGETadd))
 									{
@@ -842,25 +846,27 @@ void printState(repl_state_t state)
 	else 												{PRINT("[PRINT STATE] Unknown\n");}
 }
 
-/* pre_evaluate function
+/* preprocessor function
 * This function fill the output buffer according to the resource file name
 * It replace resource reference by its file to generate packet payload. 
 *
-*                  REPL_RAZ
-*                     |
-*                     v
-*              REPL_FILL_BUFFER   ->    REPL_ERROR
-*                     |
-*                     v
-* |----------->  REPL_ANALYZE
-* |                   |
-* |          ------------------
-* |          |                |
-* |          v                v
-* | REPL_COPY_BUFFER <- REPL_COPY_OPERAND
-* |          |
-* |          v
-* --REPL_SHIFT_BUFFER ----> REPL_END
+*                         REPL_RAZ
+*                             |
+*                             v
+* |------------------> REPL_FILL_BUFFER   ->   REPL_ERROR
+* |                           |
+* |                           v
+* |------------------->  REPL_ANALYZE
+* |                           |
+* |          ----------------------------------------
+* |          |                |                     |
+* |          v                v                     v
+* | REPL_COPY_OPERAND -> REPL_COPY_BUFFER <- REPL_EXTRACT_URI
+* |                           |
+* |        ---------------------------------
+* |        |                               |       
+* |        v                               v
+* --REPL_SHIFT_BUFFER ----------------> REPL_END
 */
 
 char
@@ -877,7 +883,7 @@ enum{
 	REF_END
 };
 
-uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter)
+uint8_t preprocessor (char* name, emma_index_t* block, uint8_t* output, uint8_t outputSize, repl_solver solver, repl_getter getter)
 {
 	// Variables
 	static char* nam = NULL;							// Name of initial resource
@@ -946,7 +952,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			PRINT("REPL_SHIFT_BUFFER\n");
 			if ((strlen((char*)buffer) < REPL_BUFFER) && (buffer[bufferIndex] == '\0'))
 			{
-				if(strlen(ref) > 0)
+				if(strlen((char*)ref) > 0)
 					currentState=REPL_ANALYZE;
 				else {
 					currentState=REPL_END;
@@ -983,9 +989,9 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 				nbBytesRead = getter(nam, buffer+bufferIndex, REPL_BUFFER-bufferIndex, namIndex);
 				namIndex += nbBytesRead;
 				*block = namIndex;
-				//PRINT("nbBytesRead: %d\n", nbBytesRead);
+				PRINT("nbBytesRead: %d\n", nbBytesRead);
 				if (bufferIndex+nbBytesRead < REPL_BUFFER-1) buffer[bufferIndex+nbBytesRead+1] = '\0';
-				//PRINT("Buffer: %s\n", (char*)buffer);
+				PRINT("Buffer: %s\n", (char*)buffer);
 			
 				// Search end of block character
 				cnt = 0;
@@ -1024,7 +1030,7 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 		else if (currentState == REPL_ANALYZE)
 		{
 			PRINT("REPL_ANALYZE \n");
-			if(strlen(ref) > 0){
+			if(strlen((char*)ref) > 0){
 				currentState = REPL_COPY_OPERAND;
 				copyIndex = bufferIndex; 
 				for(i=strlen(buffer); i < REPL_BUFFER; i++)
@@ -1033,18 +1039,20 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			}
 			else {
 				find_operator(buffer, strlen((char*)buffer), &bufferIndex);
-
 				tempC = buffer[bufferIndex];
 				buffer[bufferIndex] = '\0';
 				FLAG = NO_REF;
 
-				getter(nam, buffer2, REPL_BUFFER+1, namIndex);
-				buffer2[REPL_BUFFER+1] = '\0';
+printf("REPL_ANALYZE0: Operator : %c bufferIndex %d buffer %s \n", tempC, bufferIndex, buffer);
+				getter(nam, buffer2, REPL_BUFFER, namIndex);
+printf("REPL_ANALYZE01: Operator : %c bufferIndex %d buffer %s \n", tempC, bufferIndex, buffer);				
+				buffer2[REPL_BUFFER] = '\0';
+printf("REPL_ANALYZE1: Operator : %c bufferIndex %d buffer %s \n", tempC, bufferIndex, buffer);
 
 				if(strstr(buffer, "#") != NULL){
 					currentState = REPL_EXTRACT_URI; 
 					FLAG = REF_BEGIN_CURRENT;
-				}
+					}
 
 				else if(strstr(buffer2, "#") != NULL){
 					for(cnt_begin=0; cnt_begin < REPL_BUFFER; cnt_begin ++)
@@ -1060,16 +1068,15 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 						buffer[bufferIndex] = tempC;
 						copyIndex = 0;
 						currentState = REPL_COPY_BUFFER;
+						}
 					}
-				}
-				else 
-				{
+				else {
 					buffer[bufferIndex] = tempC;
 					copyIndex = 0;
 					currentState = REPL_COPY_BUFFER;
-				}	
+					}	
+				}
 			}
-		}
 
 		else if (currentState == REPL_EXTRACT_URI)
 		{
@@ -1084,11 +1091,11 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			/* Compute the position of reference delimiter # */
 			if(FLAG == REF_BEGIN_CURRENT){            		
 				tmp = strstr(buffer, "#");
-				pos = (char*)tmp - (char*)buffer;
-				if(pos == NULL){
+				if(tmp == NULL){
 					PRINT("ERROR UNKNOWN 1\n");
-					return;
+					return -1;
 				}
+				pos = (char*)tmp - (char*)buffer;
 			}
 			/* Set the position of delimiter # in the next buffer */
 			else if(FLAG == REF_BEGIN_NEXT)	{			
@@ -1263,6 +1270,19 @@ uint8_t pre_evaluate (char* name, emma_index_t* block, uint8_t* output, uint8_t 
 			//PRINT("END OF REPLACER ; readIndex=%d\n", *block);
 		}
 		else PRINT("[REPLACER][ERROR] Unknown state !\n");
+
+		// Remove empty block
+		if(outputCond){
+			outputCond  = 0;
+			for(cnt=0; cnt < outputSize; cnt ++)
+				if(output[cnt] != ' '){
+					outputCond = 1;
+					break;
+				}
+			if(!outputCond)
+				outputIndex = 0;
+		}
 	}
+
 	return outputIndex;
 }//*/

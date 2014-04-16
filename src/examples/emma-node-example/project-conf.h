@@ -17,9 +17,9 @@
 
 /* Save some memory for the sky platform. */
 #undef UIP_CONF_DS6_NBR_NBU
-#define UIP_CONF_DS6_NBR_NBU     10
+#define UIP_CONF_DS6_NBR_NBU     5
 #undef UIP_CONF_DS6_ROUTE_NBU
-#define UIP_CONF_DS6_ROUTE_NBU   10
+#define UIP_CONF_DS6_ROUTE_NBU   5
 
 /* Increase rpl-border-router IP-buffer when using 128. */
 #ifndef REST_MAX_CHUNK_SIZE

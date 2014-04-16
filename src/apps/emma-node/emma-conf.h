@@ -25,20 +25,22 @@
 
 #include "contiki.h"
 
+#define WATCHDOG_CONF_TIMEOUT -1
+
 /* Define the way memory is used */
 #define MEMORY STATIC
 
 /* Global debug definition */
-#define GDEBUG FALSE
+#define GDEBUG TRUE
 
 /* Process debug level */
 //#define PROCESS_DEBUG TRUE
 
 /* Client debug level */
-#define CLIENT_DEBUG TRUE
+#define CLIENT_DEBUG FALSE
 
 /* Client server level */
-#define SERVER_DEBUG TRUE
+#define SERVER_DEBUG FALSE
 
 /* Resource debug level */
 #define RESOURCE_DEBUG FALSE
@@ -70,8 +72,9 @@
 #define EMMA_CLIENT_ID		2		// Process ID used to specify the resource modifier
 #define EMMA_SYSTEM_ID      3       // Process ID used to specify the resource modifier
 
-#define EMMA_SERVER_TIMEOUT_SECOND 		15
-#define EMMA_CLIENT_POLLING_INTERVAL	15
+#define EMMA_SERVER_TIMEOUT_SECOND 		(COAP_RESPONSE_TIMEOUT * COAP_MAX_RETRANSMIT)
+#define EMMA_CLIENT_POLLING_INTERVAL	5
+#define COAP_MAX_ATTEMPTS             	4
 
 /* Tests on configuration (do not modify) */
 #if GDEBUG | CLIENT_DEBUG | SERVER_DEBUG | RESOURCE_DEBUG
