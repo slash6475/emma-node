@@ -5,7 +5,7 @@ THIS=$( cd "$( dirname "$0" )" && pwd )
 usage()
 {
         echo "emma-node install"
-	echo "install.sh DESTINATION"
+	echo "install DESTINATION"
 	echo "		DESTINATION: The location of a Contiki directory (David Kopf branch)"
 }
 
